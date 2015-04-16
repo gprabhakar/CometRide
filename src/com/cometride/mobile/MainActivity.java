@@ -1,99 +1,173 @@
 package com.cometride.mobile;
 
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.GooglePlayServicesUtil;
+import java.util.List;
+
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
-
+import android.support.v4.app.ActionBarDrawerToggle;
+import android.support.v4.view.ViewPager;
+import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarActivity;
-import android.app.Dialog;
-import android.location.Criteria;
+import android.annotation.SuppressLint;
+import android.app.ActionBar;
+import android.content.res.Configuration;
 import android.location.Location;
 import android.location.LocationListener;
-import android.location.LocationManager;
 import android.os.Bundle;
+import android.os.StrictMode;
+import android.view.Gravity;
 import android.view.Menu;
+import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemClickListener;
+import android.widget.ArrayAdapter;
+import android.widget.ListView;
+import android.widget.Toast;
 
-public class MainActivity extends ActionBarActivity implements LocationListener
+@SuppressWarnings("deprecation")
+@SuppressLint("RtlHardcoded") public class MainActivity extends ActionBarActivity implements LocationListener, OnItemClickListener
 {
 	GoogleMap map;
+	ViewPager mviewpager;
+	ActionBar actionBar;
+	private DrawerLayout drawerLayout;
+	private ListView listView;
+	private List<String> routelist;
+	private ActionBarDrawerToggle drawerListner;
 	
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+	RiderDatabaseController dbcontroller;
+	
+	@Override
+	protected void onCreate(Bundle savedInstanceState) 
+	{	
+		
+		super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         Initialize();
-        Load_Location_Zoom();
+        
+        //Loading RouteID Information from RouteInformation Table.
+        routelist = dbcontroller.GetRouteInfo();
+        listView = (ListView) findViewById(R.id.drawerList);
+        listView.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_list_item_activated_1,routelist));
+        listView.setOnItemClickListener(this);
+        
+        
+        drawerLayout = (DrawerLayout) findViewById(R.id.drawerLayout);
+        drawerListner = new ActionBarDrawerToggle(this, drawerLayout,R.drawable.ic_drawer,0,0)
+        {
+        	public void onDrawerOpened(View drawerView) 
+        	{
+        		super.onDrawerOpened(drawerView);	
+        	};
+        	public void onDrawerClosed(View drawerView) 
+        	{
+        		super.onDrawerClosed(drawerView);
+        	};
+        };
+        drawerLayout.setDrawerListener(drawerListner);
+        getSupportActionBar().setHomeButtonEnabled(true);
+        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        
+        android.app.FragmentManager fragmentManager = getFragmentManager();
+	    Bundle args = new Bundle();
+	    android.app.Fragment fragment = null;
+		fragment = new AllRouteUserInterface();
+		fragment.setArguments(args);
+	    fragmentManager.beginTransaction()
+	                   .replace(R.id.mainContent, fragment)
+	                   .commit();
+
+	    
+        Toast.makeText(MainActivity.this,"Main Create",Toast.LENGTH_SHORT).show();     
+       
     }
 
+	@Override
+	protected void onPostCreate(Bundle savedInstanceState) 
+	{
+		// TODO Auto-generated method stub
+		super.onPostCreate(savedInstanceState);
+		drawerListner.syncState();
+	}
+	
+	@Override
+	public void onConfigurationChanged(Configuration newConfig) 
+	{
+		// TODO Auto-generated method stub
+		super.onConfigurationChanged(newConfig);
+		drawerListner.onConfigurationChanged(newConfig);
+	}
+	
+	@Override
+	public void onItemClick(AdapterView<?> parent, View view, int position,long id) 
+	{
+		Toast.makeText(this, routelist.get(position), Toast.LENGTH_SHORT).show();
+		SelectItem(position);
+		android.app.FragmentManager fragmentManager = getFragmentManager();
+	    Bundle args = new Bundle();
+	    android.app.Fragment fragment = null;
+		switch (position) 
+		{
+			case 0:
+				fragment = new RouteSpecificUserInterface("Route 1");
+				break;
+			case 1:
+				fragment = new RouteSpecificUserInterface("Route 2");
+				break;
+			case 2:
+				fragment = new RouteSpecificUserInterface("Route 3");
+				break;
+			default:
+				break;
+		}
+		
+	    fragment.setArguments(args);
+	    fragmentManager.beginTransaction()
+	                   .replace(R.id.mainContent, fragment)
+	                   .commit();
 
+		drawerLayout.closeDrawer(Gravity.LEFT);
+	}
+
+	public void SelectItem(int position)
+	{
+		listView.setItemChecked(position, true);
+		SetTitle(routelist.get(position));
+			    // Highlight the selected item, update the title, and close the drawer
+	}
+	public void SetTitle(String title)
+	{
+		getSupportActionBar().setTitle(title);
+	}
+	
     @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
+    public boolean onCreateOptionsMenu(Menu menu) 
+    {
         // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.main, menu);
+    	MenuInflater inflater = getMenuInflater();
+        inflater.inflate(R.menu.main, menu);
         return true;
     }
 
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
+    public boolean onOptionsItemSelected(MenuItem item) 
+    {
         int id = item.getItemId();
-        if (id == R.id.action_settings) {
+        if (id == R.id.action_settings) 
+        {
             return true;
+        }
+        else if(drawerListner.onOptionsItemSelected(item))
+        {
+        	return true;
         }
         return super.onOptionsItemSelected(item);
     }
     
-    public void Initialize()
-    {
-    	map = ((MapFragment)getFragmentManager().findFragmentById(R.id.map)).getMap();
-    }
-    
-    public void Load_Location_Zoom()
-    {
-    	int status = GooglePlayServicesUtil.isGooglePlayServicesAvailable(getBaseContext());
-    	 
-        // Showing status
-        if(status!=ConnectionResult.SUCCESS){ // Google Play Services are not available
- 
-            int requestCode = 10;
-            Dialog dialog = GooglePlayServicesUtil.getErrorDialog(status, this, requestCode);
-            dialog.show();
- 
-        }else { // Google Play Services are available
- 
-            // Getting reference to the SupportMapFragment of activity_main.xml
-            
-            // Enabling MyLocation Layer of Google Map
-            map.setMyLocationEnabled(true);
- 
-            // Getting LocationManager object from System Service LOCATION_SERVICE
-            LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
- 
-            // Creating a criteria object to retrieve provider
-            Criteria criteria = new Criteria();
- 
-            // Getting the name of the best provider
-            String provider = locationManager.getBestProvider(criteria, true);
- 
-            // Getting Current Location
-            Location location = locationManager.getLastKnownLocation(provider);
- 
-            if(location!=null)
-            {
-                onLocationChanged(location);
-            }
-            locationManager.requestLocationUpdates(provider, 20000, 0, this);
-        }
-    }
-
-
 	@Override
 	public void onLocationChanged(Location location) 
 	{
@@ -135,4 +209,14 @@ public class MainActivity extends ActionBarActivity implements LocationListener
 		// TODO Auto-generated method stub
 		
 	}
+	
+	public void Initialize()
+	{
+		StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
+		StrictMode.setThreadPolicy(policy);
+		dbcontroller = new RiderDatabaseController(this);
+	}
+
+	
+	
 }
