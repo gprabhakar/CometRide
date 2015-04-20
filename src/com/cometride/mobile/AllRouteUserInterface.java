@@ -32,7 +32,8 @@ public class AllRouteUserInterface extends android.app.Fragment implements Locat
 	public static MapView mapView;
 	RiderDatabaseController dbcontroller;
 	
-	public AllRouteUserInterface() {
+	public AllRouteUserInterface() 
+	{
 		// Required empty public constructor
 	}
 

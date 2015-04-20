@@ -1,11 +1,17 @@
 package com.cometride.mobile;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
+
+import android.support.annotation.ColorRes;
+import android.support.annotation.DrawableRes;
 import android.support.v4.app.ActionBarDrawerToggle;
 import android.support.v4.view.ViewPager;
 import android.support.v4.widget.DrawerLayout;
@@ -13,6 +19,9 @@ import android.support.v7.app.ActionBarActivity;
 import android.annotation.SuppressLint;
 import android.app.ActionBar;
 import android.content.res.Configuration;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
 import android.location.Location;
 import android.location.LocationListener;
 import android.os.Bundle;
@@ -49,13 +58,7 @@ import android.widget.Toast;
         setContentView(R.layout.activity_main);
         Initialize();
         
-        //Loading RouteID Information from RouteInformation Table.
-        routelist = dbcontroller.GetRouteInfo();
-        listView = (ListView) findViewById(R.id.drawerList);
-        listView.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_list_item_activated_1,routelist));
-        listView.setOnItemClickListener(this);
-        
-        
+        //Initializing Drawer Layout
         drawerLayout = (DrawerLayout) findViewById(R.id.drawerLayout);
         drawerListner = new ActionBarDrawerToggle(this, drawerLayout,R.drawable.ic_drawer,0,0)
         {
@@ -71,7 +74,19 @@ import android.widget.Toast;
         drawerLayout.setDrawerListener(drawerListner);
         getSupportActionBar().setHomeButtonEnabled(true);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        getSupportActionBar().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#008542")));
         
+        
+        //Loading RouteID Information from RouteInformation Table.
+        HashMap<String,String> routelistMap = new HashMap<String, String>();
+        routelistMap = dbcontroller.GetAllRouteLatLong();
+        routelist = new ArrayList<String>(routelistMap.keySet());
+        //Arrays.asList(routelistMap.keySet().toArray());
+        listView = (ListView) findViewById(R.id.drawerList);
+        listView.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_list_item_activated_1,routelist));
+        listView.setOnItemClickListener(this);
+        
+        //Display ALl Route Information
         android.app.FragmentManager fragmentManager = getFragmentManager();
 	    Bundle args = new Bundle();
 	    android.app.Fragment fragment = null;
@@ -79,9 +94,7 @@ import android.widget.Toast;
 		fragment.setArguments(args);
 	    fragmentManager.beginTransaction()
 	                   .replace(R.id.mainContent, fragment)
-	                   .commit();
-
-	    
+	                   .commit();	    
         Toast.makeText(MainActivity.this,"Main Create",Toast.LENGTH_SHORT).show();     
        
     }
@@ -110,22 +123,8 @@ import android.widget.Toast;
 		android.app.FragmentManager fragmentManager = getFragmentManager();
 	    Bundle args = new Bundle();
 	    android.app.Fragment fragment = null;
-		switch (position) 
-		{
-			case 0:
-				fragment = new RouteSpecificUserInterface("Route 1");
-				break;
-			case 1:
-				fragment = new RouteSpecificUserInterface("Route 2");
-				break;
-			case 2:
-				fragment = new RouteSpecificUserInterface("Route 3");
-				break;
-			default:
-				break;
-		}
-		
-	    fragment.setArguments(args);
+		fragment = new RouteSpecificUserInterface(routelist.get(position));
+		fragment.setArguments(args);
 	    fragmentManager.beginTransaction()
 	                   .replace(R.id.mainContent, fragment)
 	                   .commit();
