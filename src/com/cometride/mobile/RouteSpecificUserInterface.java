@@ -5,51 +5,52 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.math.BigDecimal;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.Executor;
-
 import org.json.JSONObject;
-
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
-import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
 import com.google.android.gms.maps.MapsInitializer;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
-import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.PolylineOptions;
-//import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
-
+import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.SharedPreferences.Editor;
 import android.graphics.Color;
 import android.location.Criteria;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.support.v4.app.Fragment;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.View.OnClickListener;
 import android.view.ViewGroup;
+import android.widget.CompoundButton;
+import android.widget.LinearLayout;
+import android.widget.Switch;
+import android.widget.TextView;
+import android.widget.Toast;
+import android.widget.CompoundButton.OnCheckedChangeListener;
 
-/**
- * A simple {@link Fragment} subclass.
- * 
- */
-public class RouteSpecificUserInterface extends android.app.Fragment implements LocationListener,OnClickListener
+public class RouteSpecificUserInterface extends android.app.Fragment implements LocationListener,OnCheckedChangeListener
 {
 	private static GoogleMap map;
 	private static MapView mapView;
@@ -58,36 +59,54 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 	private View myFragmentView =null;
 	private List<String> LatLongList = new ArrayList<String>() ;
 	private RiderDatabaseController dbcontroller ;
-	private DownloadTask downloadTask;
+	private DownloadRouteTask downloadRouteTask;
+	private DownloadAllRouteTask downloadAllRouteTask;
 	private ParserTask parserTask;
 	private FetchCabLocationTask fetchTask ;
 	private List<Marker> markerlist = new ArrayList<Marker>();
+	private List<String> colorlist = new ArrayList<String>();
+	private LocationManager lm;
+	private int colorcounter = 0;
+	private HashMap<String,LatLng> routeMarkerList = new HashMap<String, LatLng>();
+	private Switch swSubscribe;
+	private LinearLayout llSubscribe;
+	private SharedPreferences pref;
+	private Editor editor;
+	private TextView tvSubscribe;
+	private int updateCounter=0;
+	private Intent in;
+	private boolean checkFlgOverride = false;
 	
+	//######################################### CONSTRUCTORS ######################################//
 	public RouteSpecificUserInterface() 
 	{	}
 
 	public RouteSpecificUserInterface(String routeID) 
 	{ 
-		this.routeID = routeID;  // Initializes the RouteID to fetch the appropriate map information to be fetched from the Database  	
+		this.routeID = routeID;  // Initializes the RouteID to fetch the appropriate map information to be fetched from the Database
+		
+		
 	}
 	
+	//################################ LIFE CYCLE EVENTS ##########################################//
 	@Override
 	public View onCreateView(LayoutInflater inflater, ViewGroup container,Bundle savedInstanceState) 
 	{
-		if(container==null)
-		{
-			return null; 
-		}
+		if(container==null){return null;}
 		try
 		{	
-			myFragmentView = inflater.inflate(R.layout.fragment_route1_user_interface,container, false);
+			myFragmentView = inflater.inflate(R.layout.fragment_route_user_interface,container, false);
 			mapView = (MapView) myFragmentView.findViewById(R.id.map_route1);
 			mapView.onCreate(savedInstanceState);
-			Initialize();
-		}
-		catch(Exception ex)
-		{		
-			//TO avoid Inflater Exception.
+			int status = GooglePlayServicesUtil.isGooglePlayServicesAvailable(getActivity());
+	    	if(status!=ConnectionResult.SUCCESS)
+	    	{
+	    		int requestCode = 10;
+	            Dialog dialog = GooglePlayServicesUtil.getErrorDialog(status, getActivity(), requestCode);
+	            dialog.show();
+	        }
+	    }
+		catch(Exception ex){//TO avoid Inflater Exception.
 		}
 		return myFragmentView;
 	}
@@ -96,116 +115,189 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 	public void onResume() 
 	{
 		super.onResume();
-		//Initialize();
+		Initialize();
 	}
 	
 	@Override
 	public void onPause() 
 	{
-		// TODO Auto-generated method stub
 		super.onPause();
-		if(fetchTask!=null)
-		{
-			fetchTask.cancel(true);
-		}
-	}
-	@Override
-	public void onClick(View v) 
-	{
-		
+		lm.removeUpdates(this);
 	}
 	
+	@Override
+	public void onDestroy() {
+		super.onDestroy();
+	}
+	
+	@Override
+	public void onDestroyView() 
+	{
+		super.onDestroyView();
+		
+	    try {
+	        trimCache(getActivity());
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	    }
+	}
+	
+	//################################# INITIALIZE ##################################################//
 	public void Initialize()
     {
 		dbcontroller = new RiderDatabaseController(getActivity());
+		
+		pref = getActivity().getSharedPreferences("COMET", 0);
+		editor = pref.edit();
+		editor.putString("CurrentScreen", routeID);
+		editor.commit();
+		
+		colorlist.add("#00CCFF");
+		colorlist.add("#FA0D0D");
+		colorlist.add("#460DF1");
+		colorlist.add("#0DF14A");
+		colorlist.add("#F68308");
+		colorlist.add("#8E8B88");
+		colorlist.add("#FF0040");
+		colorlist.add("#A9E2F3");
+		colorlist.add("#FA58D0");
+		colorlist.add("#610B0B");
+		colorlist.add("#0B3B0B");
+		colorlist.add("#8181F7");
+		colorlist.add("#F4FA58");
+		colorlist.add("#FA5882");
+		colorlist.add("#070B19");
+		colorlist.add("#0101DF");
+		
+		swSubscribe= (Switch) getActivity().findViewById(R.id.swSubscribe);
+		swSubscribe.setOnCheckedChangeListener(this);
+		
+		tvSubscribe =(TextView)getActivity().findViewById(R.id.tvSubscribe);
+		llSubscribe= (LinearLayout) getActivity().findViewById(R.id.llSubscribe);
+		
 		mapView.onResume();
-        map = mapView.getMap();
+		map = mapView.getMap();
         map.setMapType(GoogleMap.MAP_TYPE_NORMAL);
         map.setMyLocationEnabled(true);
         map.getUiSettings().setZoomControlsEnabled(true);        // Enable / Disable my location button
         map.getUiSettings().setMyLocationButtonEnabled(true);        // Enable / Disable Compass icon
-        map.getUiSettings().setCompassEnabled(false);        // Enable / Disable Rotate gesture
+        map.getUiSettings().setCompassEnabled(true);        // Enable / Disable Rotate gesture
         map.getUiSettings().setRotateGesturesEnabled(true);        // Enable / Disable zooming functionality
         map.getUiSettings().setZoomGesturesEnabled(true);
         MapsInitializer.initialize(this.getActivity());
-        markerPoints = new ArrayList<LatLng>();
         
-        LocationManager locationManager = (LocationManager) getActivity().getSystemService(Context.LOCATION_SERVICE);        // Creating a criteria object to retrieve provider
-        Criteria criteria = new Criteria();        // Getting the name of the best provider
-        String provider = locationManager.getBestProvider(criteria, true);        // Getting Current Location
-        Location location = locationManager.getLastKnownLocation(provider);
+        markerPoints = new ArrayList<LatLng>();
+        LatLng University = new LatLng(32.9864304,-96.7548886);
+        CameraPosition cameraPosition = new CameraPosition.Builder()
+        .target(University)   							 // Sets the center of the map to location user
+        .zoom(15)                  						 // Sets the zoom
+        //.bearing(90)              					 // Sets the orientation of the camera to east
+        //.tilt(40)                   					 // Sets the tilt of the camera to 30 degrees
+        .build();                   					 // Creates a CameraPosition from the builder
+        map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition),10,null);
+        
+      	lm = (LocationManager)getActivity().getSystemService(Context.LOCATION_SERVICE);
+  		lm.requestLocationUpdates(LocationManager.GPS_PROVIDER,1000,0,this);
+  		Location location = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+      	              
         if(location!=null)
         {
             onLocationChanged(location);
         }
-		LoadRouteSpecificMap();
-		
-		//Load_Location_Zoom();
+        
+        if(routeID.equals("All Routes"))
+        {
+        	LoadAllRouteMap();
+        	swSubscribe.setVisibility(View.GONE);
+        	tvSubscribe.setVisibility(View.VISIBLE);
+        }
+        else
+        {
+        	LoadRouteSpecificMap();
+        	swSubscribe.setVisibility(View.VISIBLE);
+        	tvSubscribe.setVisibility(View.GONE);
+        }		
+        
+        if(!pref.getString("SubscribedRoute", "").equals(""))
+		{
+        	swSubscribe.setChecked(true);
+			swSubscribe.setText("Subscribed to "+pref.getString("SubscribedRoute", ""));
+		}
+        else
+        {
+        	checkFlgOverride = true;
+        	swSubscribe.setChecked(false);
+        	swSubscribe.setText("Subscribe");
+        	llSubscribe.setBackgroundColor(Color.parseColor("#E98300"));
+			swSubscribe.setBackgroundColor(Color.parseColor("#E98300"));
+        }
+       
     }
 	
+	
+	//########################################### DELETING TEMP FILES TO IMPROVE SPEED ######################################//
+	public static void trimCache(Context context) {
+	    try 
+	    {
+	       File dir = context.getCacheDir();
+	       if (dir != null && dir.isDirectory()) {
+	          deleteDir(dir);
+	       }
+	    } catch (Exception e) {
+	    }
+	 }
+
+	public static boolean deleteDir(File dir) 
+	{
+	    if (dir != null && dir.isDirectory()) {
+	       String[] children = dir.list();
+	       for (int i = 0; i < children.length; i++) {
+	          boolean success = deleteDir(new File(dir, children[i]));
+	          if (!success) {
+	             return false;
+	          }
+	       }
+	    }
+	    return dir.delete();
+	}
+
+	
+	//################################################# GPS RELATED FUNCTION ###############################################//
 	@Override
 	public void onLocationChanged(Location location) 
 	{
-	   // double latitude = location.getLatitude();
-       // double longitude = location.getLongitude();
-       // LatLng latLng = new LatLng(latitude, longitude);
-       // map.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(location.getLatitude(), location.getLongitude()), 13));
-       // CameraPosition cameraPosition = new CameraPosition.Builder()
-       //.target(latLng)      // Sets the center of the map to location user
-       //.zoom(18)                   // Sets the zoom
-       //.bearing(90)                // Sets the orientation of the camera to east
-       //.tilt(40)                   // Sets the tilt of the camera to 30 degrees
-       //.build();                   // Creates a CameraPosition from the builder
-       // map.moveCamera(CameraUpdateFactory.newLatLng(latLng));
-       // map.animateCamera(CameraUpdateFactory.zoomTo(15));
-       // map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));	
+		updateCounter++;
+		
+		if(updateCounter==4)
+		{
+			Log.i("Comet","Location Update");
+			//Toast.makeText(getActivity(), "Loc Update", Toast.LENGTH_SHORT).show();
+			if(!routeID.equals("All Routes"))
+	        {
+	            fetchTask = new FetchCabLocationTask();
+	            fetchTask.execute();
+	        }
+			updateCounter=0;
+		}
 	}
 	
-	public void Load_Location_Zoom()
+	//############################################ LOADING MAP ROUTES FUNCTIONS ################################################//		
+	public void LoadRouteSpecificMap(){	
+        downloadRouteTask = new DownloadRouteTask();
+        downloadRouteTask.execute();		    
+	}
+	
+	public void LoadAllRouteMap()
 	{
-    	int status = GooglePlayServicesUtil.isGooglePlayServicesAvailable(getActivity());
-    	if(status!=ConnectionResult.SUCCESS)
-    	{
-    		int requestCode = 10;
-            Dialog dialog = GooglePlayServicesUtil.getErrorDialog(status, getActivity(), requestCode);
-            dialog.show();
- 
-        }
-    	else 
-    	{
-    		map.setMyLocationEnabled(true);
-            // Getting LocationManager object from System Service LOCATION_SERVICE
-            LocationManager locationManager = (LocationManager) getActivity().getSystemService(Context.LOCATION_SERVICE);
-            // Creating a criteria object to retrieve provider
-            Criteria criteria = new Criteria();
-            // Getting the name of the best provider
-            String provider = locationManager.getBestProvider(criteria, true);
-            // Getting Current Location
-            Location location = locationManager.getLastKnownLocation(provider);
-            if(location!=null)
-            {
-                onLocationChanged(location);
-            }
-            //locationManager.requestLocationUpdates(provider, 20000, 0, (android.location.LocationListener)this);
-        }
-	}
-	
-	
-	public void LoadRouteSpecificMap()
-	{	
-        downloadTask = new DownloadTask();
-        downloadTask.execute();		    
+	    	downloadAllRouteTask = new DownloadAllRouteTask();
+	    	downloadAllRouteTask.execute();
 	}
 	
 	private String getDirectionsUrl(LatLng origin,LatLng dest)
 	{
-	        // Origin of route
 	        String str_origin = "origin="+origin.latitude+","+origin.longitude;
-	        // Destination of route
 	        String str_dest = "destination="+dest.latitude+","+dest.longitude;
-	        // Sensor enabled
 	        String sensor = "sensor=false";
-	        // Waypoints
 	        String waypoints = "";
 	        
 	        for(int i=1;i<markerPoints.size()-1;i++)
@@ -215,26 +307,22 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 	                waypoints = "waypoints=";
 	            waypoints += point.latitude + "," + point.longitude + "|";
 	        }
-	        // Building the parameters to the web service
 	        String parameters = str_origin+"&"+str_dest+"&"+sensor+"&"+waypoints;
-	        // Output format
 	        String output = "json";
-	        // Building the url to the web service
 	        String url = "https://maps.googleapis.com/maps/api/directions/"+output+"?"+parameters;
 	        return url;
 	 }
 	
-	 /** A method to download json data from url */
-    private String downloadUrl(String strUrl) throws IOException
+	private String downloadUrl(String strUrl) throws IOException
     {
         String data = "";
         InputStream iStream = null;
         HttpURLConnection urlConnection = null;
         try
         {
-            URL url = new URL(strUrl);            // Creating an http connection to communicate with url
+            URL url = new URL(strUrl);            								 // Creating an http connection to communicate with url
             urlConnection = (HttpURLConnection) url.openConnection();            // Connecting to url
-            urlConnection.connect();            // Reading data from url
+            urlConnection.connect();           									 // Reading data from url
             iStream = urlConnection.getInputStream();
             BufferedReader br = new BufferedReader(new InputStreamReader(iStream));
             StringBuffer sb  = new StringBuffer();
@@ -265,8 +353,8 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 	}
     
     //################################# Async Task#####################################//
-    // Fetches data from url passed
-    private class DownloadTask extends AsyncTask<String, Void, String>
+ 
+    private class DownloadRouteTask extends AsyncTask<String, Void, String>
     {
         // Downloading data in non-ui thread
         @Override
@@ -276,7 +364,7 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
             String data = "";
             try
             {
-            	LatLongList = dbcontroller.GetRouteSpecificLatLong(routeID);
+        		LatLongList = dbcontroller.GetRouteSpecificLatLong(routeID);
         		markerPoints = new ArrayList<LatLng>();
             	for (String str : LatLongList) 
             	{
@@ -284,32 +372,73 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
         		}
                 String url_map = getDirectionsUrl(markerPoints.get(0),markerPoints.get(markerPoints.size()-1));
                 // Fetching the data from web service
-                 data = downloadUrl(url_map);
-            }
+                data = downloadUrl(url_map);
+        	}
             catch(Exception e)
             {
                 Log.d("Background Task",e.toString());
             }
             return data;
         }
-        // Executes in UI thread, after the execution of
-        // doInBackground()
+
         @Override
         protected void onPostExecute(String result) 
         {
             super.onPostExecute(result);
-            
-            if(downloadTask.getStatus() != AsyncTask.Status.RUNNING)
-            {
-            	downloadTask.cancel(true);
-            }
             parserTask = new ParserTask();
-            // Invokes the thread for parsing the JSON data
             parserTask.execute(result);
         }
     }
  
-    /** A class to parse the Google Places in JSON format */
+    private class DownloadAllRouteTask extends AsyncTask<String, Void , List<String>>
+    {
+    	private List<String> urlList = new ArrayList<String>();
+    	
+        // Downloading data in non-ui thread
+        @Override
+        protected List<String> doInBackground(String... url) 
+        {
+            // For storing data from web service
+            try
+            {
+            	HashMap<String,String> routelistMap = new HashMap<String, String>();
+                routelistMap = dbcontroller.GetAllRouteLatLong();
+                for (String  route : routelistMap.keySet()) 
+                {
+        			List<String> LatLongList = Arrays.asList(routelistMap.get(route).split(";"));
+        	   		markerPoints = new ArrayList<LatLng>();
+	            	for (String str : LatLongList) 
+	            	{
+	            		markerPoints.add(new LatLng(Double.parseDouble(str.split(",")[0]),Double.parseDouble(str.split(",")[1])));	
+	        		}
+	            	String url_map = getDirectionsUrl(markerPoints.get(0),markerPoints.get(markerPoints.size()-1));
+	            	routeMarkerList.put(route,markerPoints.get((markerPoints.size()-1)/2));
+	                urlList.add(downloadUrl(url_map));
+                }
+        	}
+            catch(Exception e)
+            {
+                Log.d("Background Task",e.toString());
+            }
+            return urlList;
+        }
+        // Executes in UI thread, after the execution of
+        // doInBackground()
+        @Override
+        protected void onPostExecute(List<String> result) 
+        {
+            super.onPostExecute(result);
+            
+            for (String url : result) 
+            {
+            	 parserTask = new ParserTask();
+                 // Invokes the thread for parsing the JSON data
+                 parserTask.execute(url);
+                 
+			}
+        }
+    }
+ 
     private class ParserTask extends AsyncTask<String, Integer, List<List<HashMap<String,String>>>>
     {
         // Parsing the data in non-ui thread
@@ -336,9 +465,17 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
         @Override
         protected void onPostExecute(List<List<HashMap<String, String>>> result) 
         {
-            ArrayList<LatLng> points = null;
-            PolylineOptions lineOptions = null;
- 
+            ArrayList<LatLng> points = new ArrayList<LatLng>();
+            PolylineOptions lineOptions = new PolylineOptions();
+         
+            CameraPosition cameraPosition = new CameraPosition.Builder()
+            .target(new LatLng(32.9864304,-96.7548886))      // Sets the center of the map to location user
+            .zoom(15)                   // Sets the zoom
+            //.bearing(90)                // Sets the orientation of the camera to east
+            //.tilt(40)                   // Sets the tilt of the camera to 30 degrees
+            .build();                   // Creates a CameraPosition from the builder
+            map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition),1000,null);
+            
             // Traversing through all the routes
             for(int i=0;i<result.size();i++)
             {
@@ -357,91 +494,113 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
                 }
                 // Adding all the points in the route to LineOptions
                 lineOptions.addAll(points);
-                lineOptions.width(15);
-                lineOptions.color(Color.parseColor("#00CCFF"));
+                lineOptions.width(5);
+                lineOptions.color(Color.parseColor(colorlist.get(colorcounter)));
                 lineOptions.geodesic(true);
+                map.addPolyline(lineOptions);
             }
- 
-             // Drawing polyline in the Google Map for the i-th route
-             map.addPolyline(lineOptions);
-             LatLng marker = markerPoints.get(0);
-             
-             //CameraPosition cameraPosition = new CameraPosition.Builder()
-             //.target(marker)      // Sets the center of the map to location user
-             //.zoom(15)                   // Sets the zoom
-             //.bearing(90)                // Sets the orientation of the camera to east
-             //.tilt(40)                   // Sets the tilt of the camera to 30 degrees
-             //.build();                   // Creates a CameraPosition from the builder
-             //map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition),2000,null);
-             //map.animateCamera(CameraUpdateFactory.zoomTo(10), 2000, null);
+            
+            colorcounter++;
+            if(colorcounter>15)
+            	colorcounter=0;
+            
+             //try{Thread.sleep(500);}catch(Exception ex){}
+             dropmarker();
+             //map.animateCamera(CameraUpdateFactory.zoomTo(10), 1000, null);
              //map.moveCamera(CameraUpdateFactory.newLatLngBounds(AUSTRALIA,10));
              //parserTask.cancel(true);
              //downloadTask.cancel(true);
-             if(parserTask.getStatus() != AsyncTask.Status.RUNNING)
+             //if(parserTask.getStatus() != AsyncTask.Status.RUNNING)
+             //{
+            //	 parserTask.cancel(true);
+             //}
+             if(!routeID.equals("All Routes"))
              {
-            	 parserTask.cancel(true);
+	             fetchTask = new FetchCabLocationTask();
+	             fetchTask.execute();
              }
-             fetchTask = new FetchCabLocationTask();
-             fetchTask.execute();
          }
+        public void dropmarker()
+        {
+        	 if(routeID.equals("All Routes"))
+             {
+ 	           	 for (String route : routeMarkerList.keySet()) 
+ 	           	 {
+ 	           		 Marker m =map.addMarker(new MarkerOptions()
+ 					  	     		   .title(route)
+ 					  	     		   .position(routeMarkerList.get(route))
+ 					  	     		   //.icon(BitmapDescriptorFactory.fromResource(R.drawable.route_marker))
+ 					  	     		   );
+ 	           		 m.showInfoWindow();
+ 	           	}
+             }
+             
+        }
     }
 
-	private class FetchCabLocationTask extends AsyncTask<Void,List<VehicleInfo>,Void>
+	private class FetchCabLocationTask extends AsyncTask<Void,List<VehicleInfo>,List<VehicleInfo>>
 	{
-		@SuppressWarnings("unchecked")
 		@Override
-		protected Void doInBackground(Void... params) 
+		protected List<VehicleInfo> doInBackground(Void... params) 
 		{
 			List<VehicleInfo> currentCabLocations = new ArrayList<VehicleInfo>();
-			while(true)
-			{	
-				if (isCancelled())  
-			         break;
-				
-				currentCabLocations = dbcontroller.GetLiveVehicleLocation(routeID);
-				publishProgress(currentCabLocations);
-				try
-				{
-					Thread.sleep(5000);
-				}
-				catch(Exception e){}
-			}
-			return null;
+			currentCabLocations = dbcontroller.GetLiveVehicleLocation(routeID);
+			return currentCabLocations;
 		}
 		
 		@Override
-		protected void onProgressUpdate(List<VehicleInfo>... values) 
+		protected void onPostExecute(List<VehicleInfo> result) 
 		{
+			super.onPostExecute(result);
 			for (Marker marker : markerlist) 
-			{
+			{	
 				marker.remove();
 			}
-			//super.onProgressUpdate(values);
-			for (VehicleInfo latLng : values[0]) 
+			markerlist.clear();
+	
+			for (VehicleInfo latLng : result) 
 			{
-				String Title = new String();
-				if(latLng.getSeatAvailable()>5)
-					Title = "You have good chance of getting it!!";
-				else if(latLng.getSeatAvailable()>=2)
-					Title = "You can still try!!";
-				else if(latLng.getSeatAvailable()>=0)
-					Title = "Try your Luck someone might jump off!!";
+				Location prevLoc = new Location("dummy");
+				Location currLoc = new Location("dummy");
+				
+				prevLoc.setLatitude(latLng.getPrevLocationInfo().latitude);
+				prevLoc.setLongitude(latLng.getPrevLocationInfo().longitude);
+				
+				currLoc.setLatitude(latLng.getLocationInfo().latitude);
+				currLoc.setLongitude(latLng.getLocationInfo().longitude);
+				
+				float rotation = prevLoc.bearingTo(currLoc);
+				//Toast.makeText(getActivity(), "Rotation : "+rotation, Toast.LENGTH_SHORT).show();
+				
+				//String Title = new String();
+				//if(latLng.getSeatAvailable()>5)
+				//	Title = "You have good chance of getting it!!";
+				//else if(latLng.getSeatAvailable()>=2)
+				//	Title = "You can still try!!";
+				//else if(latLng.getSeatAvailable()>=0)
+				//	Title = "Try your Luck someone might jump off!!";
 				Log.i("FETCH", latLng.getSeatAvailable()+"");
+				
+				double percentage = ((double)latLng.getSeatAvailable()/(double)latLng.getTotalCapacity())*100;
+				percentage=new BigDecimal(percentage).setScale(0, BigDecimal.ROUND_HALF_UP).doubleValue();
 				Marker marker = map.addMarker(new MarkerOptions()
 	     		   .title("Seats Available : "+latLng.getSeatAvailable())
-	     		   .snippet(Title)
+	     		   .snippet(percentage + "% Chance of Getting It")
 	     		   .position(latLng.getLocationInfo())
-	     		   .icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_car)));
+	     		   .rotation(rotation)
+	     		   .anchor(0.5f, 0.5f)
+	     		   .flat(true)
+	     		   .icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_car1)));
 	     		   //.draggable(true)
 	     		   //.snippet("The most populous city in USA.")
 	     		  //map.animateCamera(CameraUpdateFactory.newLatLngZoom(marker, 17));
-				 marker.showInfoWindow();
+				 //marker.showInfoWindow();
 				 markerlist.add(marker);
-				 
+			
 				 CameraPosition cameraPosition = new CameraPosition.Builder()
 	             .target(latLng.getLocationInfo())      // Sets the center of the map to location user
-	             .zoom(16)                   // Sets the zoom
-	             //.bearing(90)                // Sets the orientation of the camera to east
+	             .zoom(18)                   // Sets the zoom
+	             //.bearing(rotation)                // Sets the orientation of the camera to east
 	             //.tilt(40)                   // Sets the tilt of the camera to 30 degrees
 	             .build();  
 				 map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
@@ -449,55 +608,81 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 		}
 	}
 	
-	@Override
-	public void onDestroyView() 
-	{
-		// TODO Auto-generated method stub
-		super.onDestroyView();
-		 if(fetchTask.getStatus() != AsyncTask.Status.RUNNING)
-	     {
-			 fetchTask.cancel(true);
-	     }
-		if(!fetchTask.isCancelled())
-			fetchTask.cancel(true);
 		
-	    try {
-	        trimCache(getActivity());
-	       // Toast.makeText(this,"onDestroy " ,Toast.LENGTH_LONG).show();
-	    } catch (Exception e) {
-	        // TODO Auto-generated catch block
-	        e.printStackTrace();
-	    }
+	@Override
+	public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+		
+			if (isChecked) 
+		    {
+				Toast.makeText(getActivity(),"You are Subscribed", Toast.LENGTH_SHORT).show();
+				llSubscribe.setBackgroundColor(Color.RED);
+				swSubscribe.setBackgroundColor(Color.RED);
+				checkFlgOverride=false;
+				if(pref.getString("SubscribedRoute", "").equals(""))
+				{	
+					editor.putString("SubscribedRoute",routeID);
+					editor.putString("SendDistanceNotification","Yes");
+					editor.commit();
+					swSubscribe.setText("Subscribed to "+pref.getString("SubscribedRoute", routeID));
+					in = new Intent(getActivity(),RiderService.class);
+					getActivity().startService(in);
+				}
+			}
+			else
+			{
+				if(!checkFlgOverride)
+				{
+					AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+					builder.setTitle("Comet Ride")
+					   .setMessage("You are about to UnSubscibe Route "+pref.getString("SubscribedRoute", "")+", Do you Still want to").setCancelable(true)
+					   .setPositiveButton("Yes", new DialogInterface.OnClickListener() 
+					   {
+							@Override
+							public void onClick(DialogInterface dialog, int which) 
+							{
+								llSubscribe.setBackgroundColor(Color.parseColor("#E98300"));
+								swSubscribe.setBackgroundColor(Color.parseColor("#E98300"));
+								getActivity().stopService(new Intent(getActivity(), RiderService.class));
+								editor.putString("ServiceStatus", "NOT RUNNING");
+								editor.commit();
+								swSubscribe.setText("Subscribe");
+								editor.putString("SubscribedRoute","");
+								editor.commit();
+							}
+					})
+					   .setNegativeButton("No", new DialogInterface.OnClickListener() 
+					   {
+						    @Override
+						    public void onClick(DialogInterface dialog, int arg1) {
+						    	checkFlgOverride = true;
+						        swSubscribe.setChecked(true);
+						    }
+					});
+					
+					AlertDialog alert = builder.create();
+					alert.show();
+			}
+			else
+			{
+				checkFlgOverride=false;
+			}
+		}
+	}
+	
+	//######################################### UNUSED FUNCITONS ##############################################//
+	@Override
+	public void onProviderEnabled(String provider) {
 	}
 
-	public static void trimCache(Context context) {
-	    try 
-	    {
-	       File dir = context.getCacheDir();
-	       if (dir != null && dir.isDirectory()) {
-	          deleteDir(dir);
-	       }
-	    } catch (Exception e) {
-	       // TODO: handle exception
-	    }
-	 }
-
-	public static boolean deleteDir(File dir) 
-	{
-	    if (dir != null && dir.isDirectory()) {
-	       String[] children = dir.list();
-	       for (int i = 0; i < children.length; i++) {
-	          boolean success = deleteDir(new File(dir, children[i]));
-	          if (!success) {
-	             return false;
-	          }
-	       }
-	    }
-	    // The directory is now empty so delete it
-	    return dir.delete();
+	@Override
+	public void onProviderDisabled(String provider) {
 	}
-	
-	
-	
-	
+
+	@Override
+	public void onStatusChanged(String provider, int status, Bundle extras) {
+	}
+
+
 }
+
+

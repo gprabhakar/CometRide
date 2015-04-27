@@ -46,6 +46,21 @@ public class RiderDatabaseController
         mapper.save(Route);
     }
 	
+	public List<String> GetAllRoute()
+	{
+		List<String> allRoute = new ArrayList<String>();
+		
+		DynamoDBScanExpression scanExpression = new DynamoDBScanExpression();
+		PaginatedScanList<DBRouteInformationClass> result = mapper.scan(DBRouteInformationClass.class, scanExpression);
+		for (DBRouteInformationClass dbRouteInformationClass : result) {
+			if(!allRoute.contains(dbRouteInformationClass.getRouteid())){
+				allRoute.add(dbRouteInformationClass.getRouteid());
+			}
+		}
+		return allRoute;
+	}
+	
+	//
 	public HashMap<String,String> GetAllRouteLatLong()
 	{
 		HashMap<String,String> dbRouteResult= new HashMap<String, String>();
@@ -122,11 +137,30 @@ public class RiderDatabaseController
 		{
 			VehicleInfo temp_info = new VehicleInfo();
 			temp_info.setLocationInfo(new LatLng(dbLiveVehicleInfo.getVehicleLat(),dbLiveVehicleInfo.getVehicleLong()));
+			temp_info.setPrevLocationInfo(new LatLng(dbLiveVehicleInfo.getPrevlat(),dbLiveVehicleInfo.getPrevlong()));
 			temp_info.setSeatAvailable(dbLiveVehicleInfo.getVehicleTotalCapacity()-dbLiveVehicleInfo.getCurrentRiders());
+			temp_info.setTotalCapacity(dbLiveVehicleInfo.getVehicleTotalCapacity());
 			dbLatLongResult.add(temp_info);
 		}
 		
 		return dbLatLongResult;
+	}
+	
+	public List<DBLiveVehicleInformationClass> GetLiveVehicleAvailability(String routeID)
+	{
+		int Capacity = 0;
+		//List<LatLng> dbLatLongResult = new ArrayList<LatLng>();
+		DBLiveVehicleInformationClass vehicleInfo = new DBLiveVehicleInformationClass();
+		vehicleInfo.setRouteID(routeID);
+		
+		DynamoDBQueryExpression queryExpression = new DynamoDBQueryExpression()
+        	.withHashKeyValues(vehicleInfo)
+        	.withConsistentRead(false);
+
+		PaginatedQueryList<DBLiveVehicleInformationClass> result = mapper.query(DBLiveVehicleInformationClass.class, queryExpression);
+		
+		
+		return result;
 	}
 
 }

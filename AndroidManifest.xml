@@ -18,6 +18,7 @@
 	<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
 	<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
 	<uses-permission android:name="android.permission.WRITE_SETTINGS"/>
+	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     
 
     <application
@@ -25,6 +26,13 @@
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/AppTheme" >
+        <activity
+            android:name=".Blank"
+            android:label="@string/app_name"
+            android:configChanges="orientation"
+            android:screenOrientation="portrait">      
+        </activity>
+        
         <activity
             android:name=".MainActivity"
             android:label="@string/app_name"
@@ -36,6 +44,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <service 
+            android:name="RiderService"
+            android:exported="false"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="RiderService"/>
+            </intent-filter>
+        </service>
         <meta-data
 			    android:name="com.google.android.geo.API_KEY"
 			    android:value="AIzaSyDsPKjTOYQxbsaPa69_VWTcyVQ5pgpqCUQ"/>

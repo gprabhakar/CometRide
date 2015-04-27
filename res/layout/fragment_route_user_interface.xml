@@ -1,0 +1,44 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:orientation="vertical"
+    android:layout_height="match_parent"
+    tools:context=".MainActivity" >
+   <LinearLayout 
+         android:layout_width="fill_parent"
+         android:layout_height="wrap_content"
+         android:id="@+id/llSubscribe"
+         android:orientation="vertical"
+         android:background="#E98300">
+
+     <TextView
+        android:id="@+id/tvSubscribe"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#FFFFFF"
+        android:layout_gravity="center"
+        android:text="Select a Route to see Subscribe Options"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+     <Switch
+         android:id="@+id/swSubscribe "
+         android:layout_width="wrap_content"
+         android:layout_height="wrap_content"
+         android:text="Subscribe"
+         android:background="#E98300"
+         android:layout_gravity="right"
+         android:textColor="@color/white"/>
+   </LinearLayout>
+   
+   <LinearLayout 
+       android:layout_width="wrap_content"
+       android:layout_height="wrap_content"
+       android:orientation="vertical">
+       <com.google.android.gms.maps.MapView
+	        android:id="@+id/map_route1"
+	        android:layout_width="wrap_content" 
+	        android:layout_height="fill_parent" 
+	        android:layout_above="@id/map_route1"/>
+   </LinearLayout>
+     
+</LinearLayout>

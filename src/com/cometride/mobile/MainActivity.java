@@ -1,8 +1,6 @@
 package com.cometride.mobile;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -10,56 +8,119 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 
-import android.support.annotation.ColorRes;
-import android.support.annotation.DrawableRes;
 import android.support.v4.app.ActionBarDrawerToggle;
 import android.support.v4.view.ViewPager;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarActivity;
 import android.annotation.SuppressLint;
 import android.app.ActionBar;
+import android.app.ActivityManager;
+import android.app.ActivityManager.RunningServiceInfo;
+import android.app.AlertDialog;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.SharedPreferences.Editor;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
-import android.graphics.drawable.Drawable;
 import android.location.Location;
 import android.location.LocationListener;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.StrictMode;
 import android.view.Gravity;
 import android.view.Menu;
-import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
-import android.widget.ArrayAdapter;
+import android.widget.CompoundButton;
+import android.widget.CompoundButton.OnCheckedChangeListener;
+import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.Switch;
 import android.widget.Toast;
 
 @SuppressWarnings("deprecation")
 @SuppressLint("RtlHardcoded") public class MainActivity extends ActionBarActivity implements LocationListener, OnItemClickListener
 {
-	GoogleMap map;
+	private GoogleMap map;
 	ViewPager mviewpager;
 	ActionBar actionBar;
 	private DrawerLayout drawerLayout;
 	private ListView listView;
-	private List<String> routelist;
+	private List<String> routeList;
 	private ActionBarDrawerToggle drawerListner;
+	private RiderDatabaseController dbcontroller;
+	private android.app.FragmentManager fragmentManager;
+	private SharedPreferences pref;
+	private Editor editor;
 	
-	RiderDatabaseController dbcontroller;
-	
+	//############################################### LIFE CYCKE EVENTS ############################################//
 	@Override
-	protected void onCreate(Bundle savedInstanceState) 
-	{	
-		
+	protected void onCreate(Bundle savedInstanceState) {	
 		super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        Initialize();
-        
-        //Initializing Drawer Layout
-        drawerLayout = (DrawerLayout) findViewById(R.id.drawerLayout);
+     }
+	
+	@Override
+	protected void onPostCreate(Bundle savedInstanceState){
+		super.onPostCreate(savedInstanceState);
+		if(isMyServiceRunning(RiderService.class))
+		{
+			
+		}
+	}
+
+	@Override
+	protected void onResume() {
+		super.onResume();
+		Initialize(); 
+		drawerListner.syncState();
+	}
+	@Override
+	protected void onPause() {
+		super.onPause();
+	}
+	@Override
+	protected void onRestart() {
+		super.onRestart();
+	}
+	
+	@Override
+	protected void onDestroy() {
+		super.onDestroy();
+	}
+	
+	
+	private boolean isMyServiceRunning(Class<?> serviceClass) {
+	    ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+	    for (RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+	        if (serviceClass.getName().equals(service.service.getClassName())) {
+	            return true;
+	        }
+	    }
+	    return false;
+	}
+	
+	//################################# INITIALIZE ##############################################//
+	public void Initialize(){
+		
+		//AWS Thread Issue Fix
+		StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
+		StrictMode.setThreadPolicy(policy);
+		
+		pref = getSharedPreferences("COMET",0);
+		editor= pref.edit();
+		
+		dbcontroller = new RiderDatabaseController(this);
+		fragmentManager = getFragmentManager();
+		
+		
+		drawerLayout = (DrawerLayout) findViewById(R.id.drawerLayout);
         drawerListner = new ActionBarDrawerToggle(this, drawerLayout,R.drawable.ic_drawer,0,0)
         {
         	public void onDrawerOpened(View drawerView) 
@@ -71,46 +132,67 @@ import android.widget.Toast;
         		super.onDrawerClosed(drawerView);
         	};
         };
+        
         drawerLayout.setDrawerListener(drawerListner);
+        
+       
         getSupportActionBar().setHomeButtonEnabled(true);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#008542")));
         
-        
-        //Loading RouteID Information from RouteInformation Table.
-        HashMap<String,String> routelistMap = new HashMap<String, String>();
-        routelistMap = dbcontroller.GetAllRouteLatLong();
-        routelist = new ArrayList<String>(routelistMap.keySet());
-        //Arrays.asList(routelistMap.keySet().toArray());
-        listView = (ListView) findViewById(R.id.drawerList);
-        listView.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_list_item_activated_1,routelist));
-        listView.setOnItemClickListener(this);
-        
-        //Display ALl Route Information
-        android.app.FragmentManager fragmentManager = getFragmentManager();
-	    Bundle args = new Bundle();
-	    android.app.Fragment fragment = null;
-		fragment = new AllRouteUserInterface();
-		fragment.setArguments(args);
-	    fragmentManager.beginTransaction()
-	                   .replace(R.id.mainContent, fragment)
-	                   .commit();	    
-        Toast.makeText(MainActivity.this,"Main Create",Toast.LENGTH_SHORT).show();     
        
-    }
-
-	@Override
-	protected void onPostCreate(Bundle savedInstanceState) 
+		
+       if(isNetworkAvailable())
+       { 	
+    	    //Loading RouteID Information from RouteInformation Table.
+    	    routeList = new ArrayList<String>();
+    	    routeList = dbcontroller.GetAllRoute();
+    	    routeList.add("All Routes");
+    	    
+	        final CustomList customlistview = new CustomList(this,routeList);
+			
+	        //Arrays.asList(routelistMap.keySet().toArray());
+	        listView = (ListView) findViewById(R.id.drawerList);
+	        listView.setAdapter(customlistview);
+	        listView.setOnItemClickListener(this);
+        
+	        //Display ALl Route Information
+	        Bundle args = new Bundle();
+		    android.app.Fragment fragment = null;
+			
+		    String Title = getSupportActionBar().getTitle().toString();
+		    if(Title.equals("CometRide"))
+		    {
+		    	if(pref.getString("CurrentScreen","").equals(""))
+		    		Title = "All Routes";
+		    	else
+		    		Title =pref.getString("CurrentScreen", "");
+		    }
+		    
+		    fragment = new RouteSpecificUserInterface(Title);
+			fragment.setArguments(args);
+		    fragmentManager.beginTransaction()
+		                   .replace(R.id.mainContent, fragment)
+		                   .commit();
+		    getSupportActionBar().setTitle(Title);
+		    Toast.makeText(MainActivity.this,"Main Create",Toast.LENGTH_SHORT).show();     
+       }
+       else
+       {
+        	Toast.makeText(this, "Please Connect to the Internet.", Toast.LENGTH_SHORT).show();
+       }
+	}
+	
+	private boolean isNetworkAvailable() 
 	{
-		// TODO Auto-generated method stub
-		super.onPostCreate(savedInstanceState);
-		drawerListner.syncState();
+	    ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+	    NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+	    return activeNetworkInfo != null && activeNetworkInfo.isConnected();
 	}
 	
 	@Override
 	public void onConfigurationChanged(Configuration newConfig) 
 	{
-		// TODO Auto-generated method stub
 		super.onConfigurationChanged(newConfig);
 		drawerListner.onConfigurationChanged(newConfig);
 	}
@@ -118,54 +200,48 @@ import android.widget.Toast;
 	@Override
 	public void onItemClick(AdapterView<?> parent, View view, int position,long id) 
 	{
-		Toast.makeText(this, routelist.get(position), Toast.LENGTH_SHORT).show();
+		Toast.makeText(this, routeList.get(position), Toast.LENGTH_SHORT).show();
 		SelectItem(position);
-		android.app.FragmentManager fragmentManager = getFragmentManager();
-	    Bundle args = new Bundle();
+		Bundle args = new Bundle();
 	    android.app.Fragment fragment = null;
-		fragment = new RouteSpecificUserInterface(routelist.get(position));
+		fragment = new RouteSpecificUserInterface(routeList.get(position));
 		fragment.setArguments(args);
 	    fragmentManager.beginTransaction()
 	                   .replace(R.id.mainContent, fragment)
 	                   .commit();
-
 		drawerLayout.closeDrawer(Gravity.LEFT);
 	}
 
 	public void SelectItem(int position)
 	{
 		listView.setItemChecked(position, true);
-		SetTitle(routelist.get(position));
-			    // Highlight the selected item, update the title, and close the drawer
-	}
-	public void SetTitle(String title)
-	{
-		getSupportActionBar().setTitle(title);
+		if(routeList.get(position).equals("All Routes"))
+			getSupportActionBar().setTitle("CometRide");
+		else
+			getSupportActionBar().setTitle(routeList.get(position));
 	}
 	
     @Override
     public boolean onCreateOptionsMenu(Menu menu) 
     {
-        // Inflate the menu; this adds items to the action bar if it is present.
-    	MenuInflater inflater = getMenuInflater();
-        inflater.inflate(R.menu.main, menu);
+    	getMenuInflater().inflate(R.menu.main, menu);
         return true;
-    }
+   }
 
+    //boolean canAddItem = false;
+    
     @Override
     public boolean onOptionsItemSelected(MenuItem item) 
     {
         int id = item.getItemId();
-        if (id == R.id.action_settings) 
-        {
-            return true;
-        }
-        else if(drawerListner.onOptionsItemSelected(item))
+       
+        if(drawerListner.onOptionsItemSelected(item))
         {
         	return true;
         }
         return super.onOptionsItemSelected(item);
     }
+    
     
 	@Override
 	public void onLocationChanged(Location location) 
@@ -188,34 +264,23 @@ import android.widget.Toast;
         map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
 	}
 
-
 	@Override
 	public void onStatusChanged(String provider, int status, Bundle extras) {
-		// TODO Auto-generated method stub
 		
 	}
-
 
 	@Override
 	public void onProviderEnabled(String provider) {
-		// TODO Auto-generated method stub
 		
 	}
-
 
 	@Override
 	public void onProviderDisabled(String provider) {
-		// TODO Auto-generated method stub
 		
 	}
-	
-	public void Initialize()
-	{
-		StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
-		StrictMode.setThreadPolicy(policy);
-		dbcontroller = new RiderDatabaseController(this);
-	}
 
+	
+	
 	
 	
 }

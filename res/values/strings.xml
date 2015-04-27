@@ -6,8 +6,8 @@
     <string name="action_settings">Settings</string>
     <string name="hello_blank_fragment">Hello blank fragment</string>
 	<string-array name="maps">
-	    <item>Map 1</item>
-	    <item>Map 2</item>
-	    <item>Map 3</item>
+	    <item>Phase 1</item>
+	    <item>Phase 2</item>
+	    <item>University Common</item>
 	</string-array>
 </resources>
