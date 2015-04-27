@@ -234,6 +234,11 @@ import android.widget.Toast;
     public boolean onOptionsItemSelected(MenuItem item) 
     {
         int id = item.getItemId();
+        if(id==R.id.action_settings)
+        {
+        	Intent in = new Intent(this,Settings.class);
+        	startActivity(in);
+        }
        
         if(drawerListner.onOptionsItemSelected(item))
         {

@@ -22,11 +22,14 @@ import com.google.android.gms.maps.MapsInitializer;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.Polygon;
+import com.google.android.gms.maps.model.PolygonOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -62,6 +65,7 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 	private DownloadRouteTask downloadRouteTask;
 	private DownloadAllRouteTask downloadAllRouteTask;
 	private ParserTask parserTask;
+	private DrawSafePointsTask safePointTask;
 	private FetchCabLocationTask fetchTask ;
 	private List<Marker> markerlist = new ArrayList<Marker>();
 	private List<String> colorlist = new ArrayList<String>();
@@ -76,6 +80,7 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 	private int updateCounter=0;
 	private Intent in;
 	private boolean checkFlgOverride = false;
+	private boolean FirstWarningFlg = true;
 	
 	//######################################### CONSTRUCTORS ######################################//
 	public RouteSpecificUserInterface() 
@@ -115,6 +120,11 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 	public void onResume() 
 	{
 		super.onResume();
+		if(lm!=null)
+		{
+			map.clear();
+			lm.removeUpdates(this);
+		}
 		Initialize();
 	}
 	
@@ -122,6 +132,7 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 	public void onPause() 
 	{
 		super.onPause();
+		map.clear();
 		lm.removeUpdates(this);
 	}
 	
@@ -152,6 +163,9 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 		editor.putString("CurrentScreen", routeID);
 		editor.commit();
 		
+		//NotificationManager notificationManager = (NotificationManager)getActivity().getSystemService(Context.NOTIFICATION_SERVICE);
+		//notificationManager.cancelAll();
+		colorlist.add("#0039A6");
 		colorlist.add("#00CCFF");
 		colorlist.add("#FA0D0D");
 		colorlist.add("#460DF1");
@@ -196,8 +210,10 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
         .build();                   					 // Creates a CameraPosition from the builder
         map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition),10,null);
         
+        
       	lm = (LocationManager)getActivity().getSystemService(Context.LOCATION_SERVICE);
-  		lm.requestLocationUpdates(LocationManager.GPS_PROVIDER,1000,0,this);
+      	
+      	lm.requestLocationUpdates(LocationManager.GPS_PROVIDER,1000,0,this);
   		Location location = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
       	              
         if(location!=null)
@@ -284,7 +300,9 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 	//############################################ LOADING MAP ROUTES FUNCTIONS ################################################//		
 	public void LoadRouteSpecificMap(){	
         downloadRouteTask = new DownloadRouteTask();
-        downloadRouteTask.execute();		    
+        downloadRouteTask.execute();
+        //safePointTask = new DrawSafePointsTask();
+        //safePointTask.execute();
 	}
 	
 	public void LoadAllRouteMap()
@@ -373,6 +391,8 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
                 String url_map = getDirectionsUrl(markerPoints.get(0),markerPoints.get(markerPoints.size()-1));
                 // Fetching the data from web service
                 data = downloadUrl(url_map);
+                
+                  
         	}
             catch(Exception e)
             {
@@ -384,9 +404,30 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
         @Override
         protected void onPostExecute(String result) 
         {
+        	 List<String> polygonlist = dbcontroller.GetSafePointInfo(routeID);
+ 			for (String latlonglist : polygonlist) 
+ 			{
+ 				List<LatLng> safepoint = new ArrayList<LatLng>();
+ 				String[] latlong = latlonglist.split(":");
+ 				for (String str : latlong) 
+ 				{
+ 					safepoint.add(new LatLng(Double.parseDouble(str.split(",")[0]), Double.parseDouble(str.split(",")[1])));
+ 				}
+ 				
+ 				//Polygon polygon = map.addPolyline();
+ 				PolygonOptions polygonOptions = new PolygonOptions();
+ 				polygonOptions.add(safepoint.get(0),safepoint.get(2),safepoint.get(1),safepoint.get(3));
+ 			    polygonOptions.strokeColor(Color.parseColor("#69BE28"));
+ 			    polygonOptions.strokeWidth(3);
+ 			    polygonOptions.fillColor(Color.parseColor("#69BE28"));
+ 			    Polygon polygon = map.addPolygon(polygonOptions);
+ 			}
+ 			 
+ 			
             super.onPostExecute(result);
             parserTask = new ParserTask();
             parserTask.execute(result);
+            
         }
     }
  
@@ -458,6 +499,7 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
             {
                 e.printStackTrace();
             }
+            //new DrawSafePointsTask().execute();
             return routes;
         }
  
@@ -498,27 +540,19 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
                 lineOptions.color(Color.parseColor(colorlist.get(colorcounter)));
                 lineOptions.geodesic(true);
                 map.addPolyline(lineOptions);
+                
+                
             }
             
+            			
+			
             colorcounter++;
             if(colorcounter>15)
             	colorcounter=0;
             
-             //try{Thread.sleep(500);}catch(Exception ex){}
-             dropmarker();
-             //map.animateCamera(CameraUpdateFactory.zoomTo(10), 1000, null);
-             //map.moveCamera(CameraUpdateFactory.newLatLngBounds(AUSTRALIA,10));
-             //parserTask.cancel(true);
-             //downloadTask.cancel(true);
-             //if(parserTask.getStatus() != AsyncTask.Status.RUNNING)
-             //{
-            //	 parserTask.cancel(true);
-             //}
-             if(!routeID.equals("All Routes"))
-             {
-	             fetchTask = new FetchCabLocationTask();
-	             fetchTask.execute();
-             }
+            dropmarker();
+            
+             
          }
         public void dropmarker()
         {
@@ -527,10 +561,10 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
  	           	 for (String route : routeMarkerList.keySet()) 
  	           	 {
  	           		 Marker m =map.addMarker(new MarkerOptions()
- 					  	     		   .title(route)
- 					  	     		   .position(routeMarkerList.get(route))
- 					  	     		   //.icon(BitmapDescriptorFactory.fromResource(R.drawable.route_marker))
- 					  	     		   );
+			  	     		   .title(route)
+			  	     		   .position(routeMarkerList.get(route))
+			  	     		   //.icon(BitmapDescriptorFactory.fromResource(R.drawable.route_marker))
+			  	     		   );
  	           		 m.showInfoWindow();
  	           	}
              }
@@ -538,6 +572,24 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
         }
     }
 
+    public class DrawSafePointsTask extends AsyncTask<Void,Integer,String>
+    {
+
+		@Override
+		protected String doInBackground(Void... params) 
+		{
+			
+
+			return "0";
+		}
+		@Override
+		protected void onPostExecute(String result) {
+			// TODO Auto-generated method stub
+			super.onPostExecute(result);
+		}
+    	
+    }
+    
 	private class FetchCabLocationTask extends AsyncTask<Void,List<VehicleInfo>,List<VehicleInfo>>
 	{
 		@Override
@@ -552,14 +604,24 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 		protected void onPostExecute(List<VehicleInfo> result) 
 		{
 			super.onPostExecute(result);
+			//Toast.makeText(getActivity(), "Size: "+result.size(), Toast.LENGTH_SHORT).show();
 			for (Marker marker : markerlist) 
 			{	
 				marker.remove();
 			}
 			markerlist.clear();
-	
+			
+			if(result.size()==0)
+			{
+				if(FirstWarningFlg)
+				{
+					Toast.makeText(getActivity(), "There are no cabs available in "+routeID, Toast.LENGTH_SHORT).show();
+					FirstWarningFlg= false;
+				}
+			}
 			for (VehicleInfo latLng : result) 
 			{
+				FirstWarningFlg= false;
 				Location prevLoc = new Location("dummy");
 				Location currLoc = new Location("dummy");
 				
@@ -585,7 +647,7 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 				percentage=new BigDecimal(percentage).setScale(0, BigDecimal.ROUND_HALF_UP).doubleValue();
 				Marker marker = map.addMarker(new MarkerOptions()
 	     		   .title("Seats Available : "+latLng.getSeatAvailable())
-	     		   .snippet(percentage + "% Chance of Getting It")
+	     		   .snippet(percentage + "% Free")
 	     		   .position(latLng.getLocationInfo())
 	     		   .rotation(rotation)
 	     		   .anchor(0.5f, 0.5f)

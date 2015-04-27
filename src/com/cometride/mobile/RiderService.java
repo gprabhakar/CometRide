@@ -12,6 +12,7 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.app.TaskStackBuilder;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -19,6 +20,8 @@ import android.content.SharedPreferences.Editor;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.StrictMode;
@@ -36,6 +39,9 @@ public class RiderService extends Service implements LocationListener{
 	private PendingIntent pendingIntent;
 	private int UpdateCounter=0;
 	private RiderDatabaseController dbController;
+	private int duration;
+	private int frequency;
+	private int distance;
 	
 	//############################ LIFE CYCLE EVENTS ########################################//
 	@Override
@@ -70,7 +76,10 @@ public class RiderService extends Service implements LocationListener{
 		dbController= new RiderDatabaseController(getBaseContext());
 		pref = getSharedPreferences("COMET", 0);
 		editor = pref.edit();
-		
+		duration =pref.getInt("SubscriptionDuration", 10);
+	    frequency = pref.getInt("Frequency", 5);
+	    distance = pref.getInt("Distance", 200);
+	    
 		lm = (LocationManager)getSystemService(Context.LOCATION_SERVICE);
         lm.requestLocationUpdates(LocationManager.GPS_PROVIDER,1000,0,this);
         Location location = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
@@ -84,12 +93,12 @@ public class RiderService extends Service implements LocationListener{
         if(pref.getString("ServiceStatus", "NOT RUNNING").equals("NOT RUNNING"))
 		{
         	Calendar calSet = Calendar.getInstance();
-            calSet.add(Calendar.MINUTE, 10);
+            calSet.add(Calendar.MINUTE,duration);
     		
             intent = new Intent(getBaseContext(), Blank.class);
     		pendingIntent = PendingIntent.getActivity(getBaseContext(), 1 , intent, 0);
     	    alarmManager.set(AlarmManager.RTC_WAKEUP, calSet.getTimeInMillis(), pendingIntent);
-    		Toast.makeText(this, "Subscription will Expire in 10 Mins !!", Toast.LENGTH_LONG).show();
+    		Toast.makeText(this, "Subscription will Expire in "+duration+" Mins !!", Toast.LENGTH_LONG).show();
 			editor.putString("ServiceStatus", "RUNNING");
 			editor.commit();
 		}
@@ -102,12 +111,16 @@ public class RiderService extends Service implements LocationListener{
 		UpdateCounter++;
 		List<LatLng> CabLocationList = new ArrayList<LatLng>();
 		
-		if(UpdateCounter==4)
+		if(UpdateCounter==frequency)
 		{
 			Log.i("Comet","Location Updated from Service");
+			
 			CabLocationList = FetchCapacity();
-			if(pref.getString("SendDistanceNotification", "Yes").equals("Yes"))
-				CalculateDistance(CabLocationList,location);
+			if(pref.getBoolean("NotifyDistance", true))
+			{
+				if(pref.getString("SendDistanceNotification", "Yes").equals("Yes"))
+					CalculateDistance(CabLocationList,location);
+			}
 			UpdateCounter=0;
 		}
 	}
@@ -119,8 +132,11 @@ public class RiderService extends Service implements LocationListener{
 		List<LatLng> cabLocationList = new ArrayList<LatLng>();
 		
 		int availability = 0;
+		int ServiceAvailability = 0;
+		
 		for (DBLiveVehicleInformationClass dbLiveVehicleInfo : dbLiveInfo) 
 		{
+			ServiceAvailability++;
 			cabLocationList.add(new LatLng(dbLiveVehicleInfo.getVehicleLat(),dbLiveVehicleInfo.getVehicleLong()));
 			if((dbLiveVehicleInfo.getVehicleTotalCapacity()- dbLiveVehicleInfo.getCurrentRiders())> availability)
 			{
@@ -128,21 +144,38 @@ public class RiderService extends Service implements LocationListener{
 			}
 		}
 		
-		int prevAvailability = pref.getInt("SubscribedRouteAvailability", 0);
-		if(prevAvailability==0)
+		if(pref.getBoolean("NotifyService", true))
 		{
-			if(availability!=0)
-			{	
-				SendNotification(availability+" Seat Available","");
-				Toast.makeText(getBaseContext(), "Seat Available", Toast.LENGTH_SHORT).show();
+			int prevServiceAvailability= pref.getInt("SubscribedServiceAvailability", 0);
+			if((prevServiceAvailability==0)&& (ServiceAvailability!=0))
+			{
+				SendNotification("Cab Service Available in the Subscribed Route", "");
+			}
+			else if((prevServiceAvailability!=0)&& (ServiceAvailability==0))
+			{
+				SendNotification("Cab Service Cancelled in the Subscribed Route", "");
 			}
 		}
-		else
+		editor.putInt("SubscribedServiceAvailability", ServiceAvailability);
+		
+		if(pref.getBoolean("NotifySeat", true))
 		{
-			if(availability==0)
-			{	
-				SendNotification("Seat Not Available","");
-				Toast.makeText(getBaseContext(), "Seat Not Available", Toast.LENGTH_SHORT).show();
+			int prevAvailability = pref.getInt("SubscribedRouteAvailability", 0);
+			if(prevAvailability==0)
+			{
+				if(availability!=0)
+				{	
+					SendNotification(availability+" Seat(s) Available","");
+					Toast.makeText(getBaseContext(), "Seat Available", Toast.LENGTH_SHORT).show();
+				}
+			}
+			else
+			{
+				if(availability==0)
+				{	
+					if(ServiceAvailability!=0)
+						SendNotification("No Seats Available","");
+				}
 			}
 		}
 		editor.putInt("SubscribedRouteAvailability", availability);
@@ -154,22 +187,21 @@ public class RiderService extends Service implements LocationListener{
 	public void CalculateDistance(List<LatLng> CabLocationList,Location location)
 	{
 		float[] result = new float[2];
-		float distance = 1000;
+		float cabdistance = 1000;
 		for (LatLng latLng : CabLocationList) 
 		{
 			Location.distanceBetween(location.getLatitude(),location.getLongitude(),latLng.latitude,latLng.longitude,result);
-			if(distance>result[0])
-				distance=result[0];
+			if(cabdistance>result[0])
+				cabdistance=result[0];
 		}
-		if(distance<200)
+		if(cabdistance < distance)
 		{
-			double ETA = (0.33334)*(result[0] * 0.00062137)*60;
+			double ETA = (0.33334)*(cabdistance * 0.00062137)*60;
 			int min = (int)ETA;
 			int sec =  (int)(ETA - min)*60;
-			SendNotification("Cab Is Near You","ETA :~ "+min+"Mins "+sec+"Sec");
+			SendNotification("Cab Is Near You","ETA : "+min+" Mins "+sec+" Sec");
 			editor.putString("SendDistanceNotification", "No");
 			editor.commit();
-			//CalculateDistance(CabLocationList,location);
 		}
 	
 		
@@ -177,11 +209,17 @@ public class RiderService extends Service implements LocationListener{
 
 	public void SendNotification(String Message,String SecondMessage)
     {			
-      Intent intent = new Intent(getBaseContext(), MainActivity.class);			
-	  PendingIntent pIntent = PendingIntent.getActivity(getBaseContext(),0 ,intent,0);
+      Intent inOpen = new Intent(getBaseContext(), Settings.class);			
+      inOpen.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+      inOpen.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+      PendingIntent pInOpen = PendingIntent.getActivity(getBaseContext(),0 ,inOpen,0);
+	  
+      Intent inDelete = new Intent(getBaseContext(), Blank.class);			
+	  PendingIntent pInDelete = PendingIntent.getActivity(getBaseContext(),0 ,inDelete,0);
+	  
 		
-	  Intent callIntent = new Intent(Intent.ACTION_DELETE);
-      PendingIntent callpIntent = PendingIntent.getActivity(getBaseContext(), 0, callIntent, 0);
+	  //Intent callIntent = new Intent(Intent.ACTION_DELETE);
+      //PendingIntent callpIntent = PendingIntent.getActivity(getBaseContext(), 0, callIntent, 0);
 		
       NotificationCompat.InboxStyle inboxStyle = new NotificationCompat.InboxStyle();
 	  String[] events = new String[]{Message,"",SecondMessage,"","",""};
@@ -191,20 +229,22 @@ public class RiderService extends Service implements LocationListener{
 		{
 		    inboxStyle.addLine(events[i]);
 		}
-		
+	  Uri uri= RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+
 	  NotificationCompat.Builder n  = new NotificationCompat.Builder(getBaseContext());
 	  n.setContentTitle("CometRide");
-	  //n.setContentText(SecondMessage);
 	  n.setSmallIcon(R.drawable.ic_launcher);
 	  n.setAutoCancel(true);
-	  n.addAction(R.drawable.ic_action_action_thumb_up,"Open CometRide",callpIntent);
-	  n.addAction(R.drawable.ic_action_action_delete,"UnSubscribe",callpIntent);
+	  n.setContentIntent(pInOpen);
+	  n.addAction(R.drawable.ic_action_action_settings,"Settings",pInOpen);
+	  n.addAction(R.drawable.ic_action_action_delete,"UnSubscribe",pInDelete);
 	  n.setStyle(inboxStyle);
+	  n.setSound(uri);
 	  n.setPriority(Notification.PRIORITY_MAX);
-	  n.build(); 
-	            
+	  Notification not = n.build();
+	  not.flags = Notification.FLAG_AUTO_CANCEL;
 	  NotificationManager notificationManager = (NotificationManager) getBaseContext().getSystemService(Context.NOTIFICATION_SERVICE);
-	  notificationManager.notify(0, n.build()); 
+	  notificationManager.notify(0, not); 
 	}	    	
 	
 	

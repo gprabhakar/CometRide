@@ -159,8 +159,26 @@ public class RiderDatabaseController
 
 		PaginatedQueryList<DBLiveVehicleInformationClass> result = mapper.query(DBLiveVehicleInformationClass.class, queryExpression);
 		
-		
 		return result;
+	}
+	
+	public List<String> GetSafePointInfo(String routeid)
+	{
+		List<String> latlongList = new ArrayList<String>();
+		DBSafePointInformationClass safepointInfo = new DBSafePointInformationClass();
+		safepointInfo.setRouteID(routeid);
+		
+		DynamoDBQueryExpression queryExpression = new DynamoDBQueryExpression()
+        	.withHashKeyValues(safepointInfo)
+        	.withConsistentRead(false);
+
+		PaginatedQueryList<DBSafePointInformationClass> result = mapper.query(DBSafePointInformationClass.class, queryExpression);
+		for (DBSafePointInformationClass dbSafePointInformationClass : result) 
+		{
+			latlongList.add(dbSafePointInformationClass.getLatlong());
+		}
+
+		return latlongList;
 	}
 
 }

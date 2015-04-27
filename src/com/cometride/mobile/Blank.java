@@ -1,5 +1,7 @@
 package com.cometride.mobile;
 
+import android.app.NotificationManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
@@ -25,6 +27,8 @@ public class Blank extends ActionBarActivity
 		editor.putString("SubscribedRoute", "");
 		editor.putString("ServiceStatus", "NOT RUNNING");
 		editor.commit();
+		NotificationManager notificationManager = (NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE);
+		notificationManager.cancelAll();
 		stopService(new Intent(this,RiderService.class));
 		this.finish();
 	}

@@ -14,7 +14,8 @@ public class DirectionsJSONParser
 {
 
     /** Receives a JSONObject and returns a list of lists containing latitude and longitude */
-    public List<List<HashMap<String,String>>> parse(JSONObject jObject){
+    @SuppressWarnings("unchecked")
+	public List<List<HashMap<String,String>>> parse(JSONObject jObject){
  
         List<List<HashMap<String, String>>> routes = new ArrayList<List<HashMap<String,String>>>();
         JSONArray jRoutes = null;
@@ -28,7 +29,8 @@ public class DirectionsJSONParser
             /** Traversing all routes */
             for(int i=0;i<jRoutes.length();i++){
                 jLegs = ( (JSONObject)jRoutes.get(i)).getJSONArray("legs");
-                List path = new ArrayList<HashMap<String, String>>();
+                @SuppressWarnings("rawtypes")
+				List path = new ArrayList<HashMap<String, String>>();
  
                 /** Traversing all legs */
                 for(int j=0;j<jLegs.length();j++){
