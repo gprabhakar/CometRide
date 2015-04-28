@@ -17,6 +17,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
+import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -80,9 +81,13 @@ public class RiderService extends Service implements LocationListener{
 	    frequency = pref.getInt("Frequency", 5);
 	    distance = pref.getInt("Distance", 200);
 	    
-		lm = (LocationManager)getSystemService(Context.LOCATION_SERVICE);
-        lm.requestLocationUpdates(LocationManager.GPS_PROVIDER,1000,0,this);
-        Location location = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+	    Criteria criteria = new Criteria();
+        criteria.setAccuracy(Criteria.ACCURACY_MEDIUM | Criteria.ACCURACY_MEDIUM);
+        lm = (LocationManager)getBaseContext().getSystemService(Context.LOCATION_SERVICE);
+      	String provider = lm.getBestProvider(criteria, true);
+      	lm.requestLocationUpdates(provider,100,0,this);
+      	Location location = lm.getLastKnownLocation(provider);
+      	
         alarmManager = (AlarmManager)getSystemService(Context.ALARM_SERVICE);
         
         if(location!=null)
@@ -111,9 +116,10 @@ public class RiderService extends Service implements LocationListener{
 		UpdateCounter++;
 		List<LatLng> CabLocationList = new ArrayList<LatLng>();
 		
-		if(UpdateCounter==frequency)
+		if(UpdateCounter==5)
 		{
 			Log.i("Comet","Location Updated from Service");
+			Toast.makeText(this,"Loc Service", Toast.LENGTH_SHORT).show();
 			
 			CabLocationList = FetchCapacity();
 			if(pref.getBoolean("NotifyDistance", true))
@@ -202,20 +208,23 @@ public class RiderService extends Service implements LocationListener{
 			SendNotification("Cab Is Near You","ETA : "+min+" Mins "+sec+" Sec");
 			editor.putString("SendDistanceNotification", "No");
 			editor.commit();
-		}
-	
-		
+		}	
 	}
 
 	public void SendNotification(String Message,String SecondMessage)
     {			
-      Intent inOpen = new Intent(getBaseContext(), Settings.class);			
-      inOpen.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-      inOpen.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-      PendingIntent pInOpen = PendingIntent.getActivity(getBaseContext(),0 ,inOpen,0);
+      Intent inOpen = new Intent(getApplicationContext(), NotificationSettings.class);
+      inOpen.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+      PendingIntent pInOpen = PendingIntent.getActivity(getApplicationContext(),0,inOpen,0);
 	  
-      Intent inDelete = new Intent(getBaseContext(), Blank.class);			
-	  PendingIntent pInDelete = PendingIntent.getActivity(getBaseContext(),0 ,inDelete,0);
+      Intent inApp = new Intent(getApplicationContext(), MainActivity.class);			
+      inApp.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+      PendingIntent pInApp = PendingIntent.getActivity(getApplicationContext(),0 ,inApp,0);
+	  
+      
+      Intent inDelete = new Intent(getApplicationContext(), Blank.class);			
+      inDelete.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+      PendingIntent pInDelete = PendingIntent.getActivity(getApplicationContext(),0 ,inDelete,0);
 	  
 		
 	  //Intent callIntent = new Intent(Intent.ACTION_DELETE);
@@ -235,7 +244,7 @@ public class RiderService extends Service implements LocationListener{
 	  n.setContentTitle("CometRide");
 	  n.setSmallIcon(R.drawable.ic_launcher);
 	  n.setAutoCancel(true);
-	  n.setContentIntent(pInOpen);
+	  n.setContentIntent(pInApp);
 	  n.addAction(R.drawable.ic_action_action_settings,"Settings",pInOpen);
 	  n.addAction(R.drawable.ic_action_action_delete,"UnSubscribe",pInDelete);
 	  n.setStyle(inboxStyle);

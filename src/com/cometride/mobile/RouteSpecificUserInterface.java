@@ -8,6 +8,7 @@ import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.security.Provider;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -42,6 +43,8 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -65,7 +68,6 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 	private DownloadRouteTask downloadRouteTask;
 	private DownloadAllRouteTask downloadAllRouteTask;
 	private ParserTask parserTask;
-	private DrawSafePointsTask safePointTask;
 	private FetchCabLocationTask fetchTask ;
 	private List<Marker> markerlist = new ArrayList<Marker>();
 	private List<String> colorlist = new ArrayList<String>();
@@ -146,7 +148,7 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 	{
 		super.onDestroyView();
 		
-	    try {
+	     try {
 	        trimCache(getActivity());
 	    } catch (Exception e) {
 	        e.printStackTrace();
@@ -210,17 +212,18 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
         .build();                   					 // Creates a CameraPosition from the builder
         map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition),10,null);
         
-        
-      	lm = (LocationManager)getActivity().getSystemService(Context.LOCATION_SERVICE);
-      	
-      	lm.requestLocationUpdates(LocationManager.GPS_PROVIDER,1000,0,this);
-  		Location location = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-      	              
-        if(location!=null)
+        //Criteria criteria = new Criteria();
+        //criteria.setAccuracy(Criteria.ACCURACY_COARSE);
+        lm = (LocationManager)getActivity().getSystemService(Context.LOCATION_SERVICE);
+      	//String provider = lm.getBestProvider(criteria, true);
+      	lm.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER,100,0,this);
+      	Location location = lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER);
+      	if(location!=null)
         {
             onLocationChanged(location);
         }
         
+      	//Toast.makeText(getActivity(),, Toast.LENGTH_SHORT).show();
         if(routeID.equals("All Routes"))
         {
         	LoadAllRouteMap();
@@ -283,9 +286,11 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 	public void onLocationChanged(Location location) 
 	{
 		updateCounter++;
+		//Toast.makeText(getActivity(),"Loc",Toast.LENGTH_SHORT).show();
 		
-		if(updateCounter==4)
+		if(updateCounter==5)
 		{
+			Toast.makeText(getActivity(),"Location Update",Toast.LENGTH_SHORT).show();
 			Log.i("Comet","Location Update");
 			//Toast.makeText(getActivity(), "Loc Update", Toast.LENGTH_SHORT).show();
 			if(!routeID.equals("All Routes"))
@@ -327,7 +332,7 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 	        }
 	        String parameters = str_origin+"&"+str_dest+"&"+sensor+"&"+waypoints;
 	        String output = "json";
-	        String url = "https://maps.googleapis.com/maps/api/directions/"+output+"?"+parameters;
+	        String url = "https://maps.googleapis.com/maps/api/directions/"+output+"?"+parameters+"&mode=walking";
 	        return url;
 	 }
 	

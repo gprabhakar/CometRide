@@ -15,10 +15,9 @@ import android.support.v7.app.ActionBarActivity;
 import android.annotation.SuppressLint;
 import android.app.ActionBar;
 import android.app.ActivityManager;
+import android.provider.Settings;
 import android.app.ActivityManager.RunningServiceInfo;
-import android.app.AlertDialog;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
@@ -37,11 +36,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
-import android.widget.CompoundButton;
-import android.widget.CompoundButton.OnCheckedChangeListener;
-import android.widget.EditText;
 import android.widget.ListView;
-import android.widget.Switch;
 import android.widget.Toast;
 
 @SuppressWarnings("deprecation")
@@ -95,6 +90,11 @@ import android.widget.Toast;
 		super.onDestroy();
 	}
 	
+	@Override
+	public void onBackPressed() {
+		// TODO Auto-generated method stub
+		android.os.Process.killProcess(android.os.Process.myPid());
+	}
 	
 	private boolean isMyServiceRunning(Class<?> serviceClass) {
 	    ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
@@ -119,9 +119,8 @@ import android.widget.Toast;
 		dbcontroller = new RiderDatabaseController(this);
 		fragmentManager = getFragmentManager();
 		
-		
 		drawerLayout = (DrawerLayout) findViewById(R.id.drawerLayout);
-        drawerListner = new ActionBarDrawerToggle(this, drawerLayout,R.drawable.ic_drawer,0,0)
+        drawerListner = new ActionBarDrawerToggle(this, drawerLayout,R.drawable.ic_action_action_view_list,0,0)
         {
         	public void onDrawerOpened(View drawerView) 
         	{
@@ -134,14 +133,11 @@ import android.widget.Toast;
         };
         
         drawerLayout.setDrawerListener(drawerListner);
-        
-       
         getSupportActionBar().setHomeButtonEnabled(true);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#008542")));
         
        
-		
        if(isNetworkAvailable())
        { 	
     	    //Loading RouteID Information from RouteInformation Table.
@@ -165,7 +161,7 @@ import android.widget.Toast;
 		    {
 		    	if(pref.getString("CurrentScreen","").equals(""))
 		    		Title = "All Routes";
-		    	else
+		    	else if(!Title.equals("Exit"))
 		    		Title =pref.getString("CurrentScreen", "");
 		    }
 		    
@@ -175,12 +171,27 @@ import android.widget.Toast;
 		                   .replace(R.id.mainContent, fragment)
 		                   .commit();
 		    getSupportActionBar().setTitle(Title);
+		    
 		    Toast.makeText(MainActivity.this,"Main Create",Toast.LENGTH_SHORT).show();     
        }
        else
        {
         	Toast.makeText(this, "Please Connect to the Internet.", Toast.LENGTH_SHORT).show();
+        	startActivity(new Intent(Settings.ACTION_DATA_ROAMING_SETTINGS));
        }
+       CheckGPS();
+	}
+	
+	public void CheckGPS()
+	{
+		String provider = Settings.Secure.getString(getContentResolver(),Settings.Secure.LOCATION_PROVIDERS_ALLOWED);
+		if(provider.equals(""))
+		{
+			Toast.makeText(this, "Please Enable GPS Settings", Toast.LENGTH_LONG).show();
+			Intent in = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+			//Intent in = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS);
+			startActivity(in);
+		}
 	}
 	
 	private boolean isNetworkAvailable() 
@@ -236,7 +247,7 @@ import android.widget.Toast;
         int id = item.getItemId();
         if(id==R.id.action_settings)
         {
-        	Intent in = new Intent(this,Settings.class);
+        	Intent in = new Intent(this,NotificationSettings.class);
         	startActivity(in);
         }
        
@@ -251,22 +262,22 @@ import android.widget.Toast;
 	@Override
 	public void onLocationChanged(Location location) 
 	{
-		double latitude = location.getLatitude();
-        double longitude = location.getLongitude();
-        LatLng latLng = new LatLng(latitude, longitude);
+		//double latitude = location.getLatitude();
+        //double longitude = location.getLongitude();
+        //LatLng latLng = new LatLng(latitude, longitude);
  
-        map.animateCamera(CameraUpdateFactory.newLatLngZoom(
-                new LatLng(location.getLatitude(), location.getLongitude()), 13));
+        //map.animateCamera(CameraUpdateFactory.newLatLngZoom(
+          //      new LatLng(location.getLatitude(), location.getLongitude()), 13));
 
-        CameraPosition cameraPosition = new CameraPosition.Builder()
-        .target(latLng)      // Sets the center of the map to location user
-        .zoom(18)                   // Sets the zoom
+        //CameraPosition cameraPosition = new CameraPosition.Builder()
+        //.target(latLng)      // Sets the center of the map to location user
+        //.zoom(18)                   // Sets the zoom
         //.bearing(90)                // Sets the orientation of the camera to east
         //.tilt(40)                   // Sets the tilt of the camera to 30 degrees
-        .build();                   // Creates a CameraPosition from the builder
-        map.moveCamera(CameraUpdateFactory.newLatLng(latLng));
-        map.animateCamera(CameraUpdateFactory.zoomTo(15));
-        map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
+        //.build();                   // Creates a CameraPosition from the builder
+        //map.moveCamera(CameraUpdateFactory.newLatLng(latLng));
+        //map.animateCamera(CameraUpdateFactory.zoomTo(15));
+        //map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
 	}
 
 	@Override

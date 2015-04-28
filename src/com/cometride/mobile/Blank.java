@@ -17,6 +17,7 @@ public class Blank extends ActionBarActivity
 	protected void onCreate(Bundle savedInstanceState) {
 		// TODO Auto-generated method stub
 		super.onCreate(savedInstanceState);
+		setContentView(R.layout.blank);
 		Initialize();
 	}
 	
@@ -30,7 +31,7 @@ public class Blank extends ActionBarActivity
 		NotificationManager notificationManager = (NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE);
 		notificationManager.cancelAll();
 		stopService(new Intent(this,RiderService.class));
-		this.finish();
+		startActivity(new Intent(this,MainActivity.class));
 	}
 
 }

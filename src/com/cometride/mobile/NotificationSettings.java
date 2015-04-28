@@ -1,5 +1,8 @@
 package com.cometride.mobile;
 
+import android.app.NotificationManager;
+import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
 import android.os.Bundle;
@@ -11,7 +14,7 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.Toast;
 
-public class Settings extends ActionBarActivity implements OnClickListener
+public class NotificationSettings extends ActionBarActivity implements OnClickListener
 {
 
 	private CheckBox chkSeat;
@@ -53,6 +56,9 @@ public class Settings extends ActionBarActivity implements OnClickListener
 	
 	public void Initialize()
 	{
+		NotificationManager notificationManager = (NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE);
+		notificationManager.cancelAll();
+		
 		chkSeat =(CheckBox)findViewById(R.id.chkSeat);
 		chkDistance =(CheckBox)findViewById(R.id.chkDistance);
 		chkService =(CheckBox)findViewById(R.id.chkService);
@@ -76,7 +82,10 @@ public class Settings extends ActionBarActivity implements OnClickListener
 	}
 	//########################################## CLICK EVENT #################################//
 	@Override
-	public void onClick(View v) {
+	public void onClick(View v) 
+	{
+		Intent in;
+		
 		switch (v.getId()) {
 		case R.id.btnSave:
 			int distance = 200;
@@ -139,16 +148,23 @@ public class Settings extends ActionBarActivity implements OnClickListener
 			editor.putInt("Frequency",frequency);
 			editor.putInt("Distance", distance);
 			editor.commit();
-			this.finish();
+			
+			in = new Intent(this,MainActivity.class);
+			startActivity(in);
 			
 			break;
 		case R.id.btnCancel:
-			this.finish();
+			//this.finish();
+			in = new Intent(this,MainActivity.class);
+			startActivity(in);
 			break;
 		default:
 			break;
 		}
 		
+	}
+	@Override
+	public void onBackPressed() {
 	}
 
 }
