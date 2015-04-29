@@ -68,7 +68,7 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 	private DownloadRouteTask downloadRouteTask;
 	private DownloadAllRouteTask downloadAllRouteTask;
 	private ParserTask parserTask;
-	private FetchCabLocationTask fetchTask ;
+	private FetchAsyncTask fetchTask ;
 	private List<Marker> markerlist = new ArrayList<Marker>();
 	private List<String> colorlist = new ArrayList<String>();
 	private LocationManager lm;
@@ -135,6 +135,9 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 	{
 		super.onPause();
 		map.clear();
+		//parserTask.cancel(true);
+		//downloadRouteTask.cancel(true);
+		fetchTask.cancel(true);
 		lm.removeUpdates(this);
 	}
 	
@@ -148,22 +151,25 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 	{
 		super.onDestroyView();
 		
-	     try {
-	        trimCache(getActivity());
-	    } catch (Exception e) {
-	        e.printStackTrace();
-	    }
+	     //try {
+	     //   trimCache(getActivity());
+	    //} catch (Exception e) {
+	     //   e.printStackTrace();
+	    //}
 	}
 	
 	//################################# INITIALIZE ##################################################//
 	public void Initialize()
     {
 		dbcontroller = new RiderDatabaseController(getActivity());
-		
 		pref = getActivity().getSharedPreferences("COMET", 0);
 		editor = pref.edit();
 		editor.putString("CurrentScreen", routeID);
 		editor.commit();
+		
+		parserTask = new ParserTask();
+		downloadRouteTask = new DownloadRouteTask();
+		fetchTask = new FetchAsyncTask();
 		
 		//NotificationManager notificationManager = (NotificationManager)getActivity().getSystemService(Context.NOTIFICATION_SERVICE);
 		//notificationManager.cancelAll();
@@ -216,8 +222,9 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
         //criteria.setAccuracy(Criteria.ACCURACY_COARSE);
         lm = (LocationManager)getActivity().getSystemService(Context.LOCATION_SERVICE);
       	//String provider = lm.getBestProvider(criteria, true);
-      	lm.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER,100,0,this);
-      	Location location = lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER);
+      	lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER,100,0,this);
+      	Location location = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+      	
       	if(location!=null)
         {
             onLocationChanged(location);
@@ -250,8 +257,48 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
         	llSubscribe.setBackgroundColor(Color.parseColor("#E98300"));
 			swSubscribe.setBackgroundColor(Color.parseColor("#E98300"));
         }
-       
+        
     }
+	
+	Thread check;
+	boolean stopFlg = false;
+	
+	//############################### CHECK THREAD #################################//
+	public void StartThread()
+	{	
+		check = (new Thread() 
+		{
+            // This method is called when the thread runs
+            public void run() 
+            {
+            	while(true)
+            	{
+                	try {
+						Thread.sleep(1000);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+	            	if(stopFlg)
+	            	{	
+	            		break;
+	            	}
+	            	if(parserTask.getStatus().equals(AsyncTask.Status.FINISHED) && downloadRouteTask.getStatus().equals(AsyncTask.Status.FINISHED))
+	        		{
+	        				if(!routeID.equals("All Routes"))
+	        		        {
+	        					fetchTask = new FetchAsyncTask();
+	        		            fetchTask.execute();
+	        					stopFlg=true;
+	        		        }
+	        				//updateCounter=0;
+	        		}
+		            
+	        	}
+            }
+        });
+		check.start();
+	}
+	
 	
 	
 	//########################################### DELETING TEMP FILES TO IMPROVE SPEED ######################################//
@@ -285,30 +332,35 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 	@Override
 	public void onLocationChanged(Location location) 
 	{
-		updateCounter++;
 		//Toast.makeText(getActivity(),"Loc",Toast.LENGTH_SHORT).show();
-		
-		if(updateCounter==5)
+		if(parserTask.getStatus().equals(AsyncTask.Status.FINISHED) && downloadRouteTask.getStatus().equals(AsyncTask.Status.FINISHED))
 		{
-			Toast.makeText(getActivity(),"Location Update",Toast.LENGTH_SHORT).show();
-			Log.i("Comet","Location Update");
-			//Toast.makeText(getActivity(), "Loc Update", Toast.LENGTH_SHORT).show();
-			if(!routeID.equals("All Routes"))
-	        {
-	            fetchTask = new FetchCabLocationTask();
-	            fetchTask.execute();
-	        }
-			updateCounter=0;
+			updateCounter++;
+			if(updateCounter==1)
+			{
+	            //Toast.makeText(getActivity(),"Location Update",Toast.LENGTH_SHORT).show();
+				Log.i("Comet","Location Update");
+				//Toast.makeText(getActivity(), "Loc Update", Toast.LENGTH_SHORT).show();
+				if(!routeID.equals("All Routes"))
+		        {
+					//fetchTask = new FetchCabLocationTask();
+		            //fetchTask.execute();
+					//fetchTask = new FetchAsyncTask();
+		            //fetchTask.execute();
+		        }
+				//updateCounter=0;
+			}
 		}
 	}
 	
 	//############################################ LOADING MAP ROUTES FUNCTIONS ################################################//		
 	public void LoadRouteSpecificMap(){	
-        downloadRouteTask = new DownloadRouteTask();
+        //downloadRouteTask = new DownloadRouteTask();
         downloadRouteTask.execute();
-        //safePointTask = new DrawSafePointsTask();
-        //safePointTask.execute();
-	}
+        //fetchTask = new FetchCabLocationTask();
+        //fetchTask.execute();
+
+    }
 	
 	public void LoadAllRouteMap()
 	{
@@ -430,7 +482,7 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
  			 
  			
             super.onPostExecute(result);
-            parserTask = new ParserTask();
+            //parserTask = new ParserTask();
             parserTask.execute(result);
             
         }
@@ -544,21 +596,16 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
                 lineOptions.width(5);
                 lineOptions.color(Color.parseColor(colorlist.get(colorcounter)));
                 lineOptions.geodesic(true);
-                map.addPolyline(lineOptions);
-                
-                
+                map.addPolyline(lineOptions);           
             }
-            
-            			
-			
             colorcounter++;
             if(colorcounter>15)
             	colorcounter=0;
             
             dropmarker();
+            StartThread();
             
-             
-         }
+        }
         public void dropmarker()
         {
         	 if(routeID.equals("All Routes"))
@@ -577,24 +624,6 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
         }
     }
 
-    public class DrawSafePointsTask extends AsyncTask<Void,Integer,String>
-    {
-
-		@Override
-		protected String doInBackground(Void... params) 
-		{
-			
-
-			return "0";
-		}
-		@Override
-		protected void onPostExecute(String result) {
-			// TODO Auto-generated method stub
-			super.onPostExecute(result);
-		}
-    	
-    }
-    
 	private class FetchCabLocationTask extends AsyncTask<Void,List<VehicleInfo>,List<VehicleInfo>>
 	{
 		@Override
@@ -624,6 +653,7 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 					FirstWarningFlg= false;
 				}
 			}
+			
 			for (VehicleInfo latLng : result) 
 			{
 				FirstWarningFlg= false;
@@ -674,14 +704,111 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 	        }	
 		}
 	}
-	
 		
+	private class FetchAsyncTask extends AsyncTask<Void,List<VehicleInfo>,Void>
+	{
+		@Override
+		protected Void doInBackground(Void... params) 
+		{
+			while(true)
+			{
+				if(isCancelled())
+					break;
+				
+				try {
+					Thread.sleep(3000);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				Log.i("Comet","Back");
+				
+				List<VehicleInfo> currentCabLocations = new ArrayList<VehicleInfo>();
+				currentCabLocations = dbcontroller.GetLiveVehicleLocation(routeID);
+				publishProgress(currentCabLocations);
+				//return currentCabLocations;
+			}
+			return null;
+		}
+		
+		@Override
+		protected void onProgressUpdate(List<VehicleInfo>... result) {
+			// TODO Auto-generated method stub
+			super.onProgressUpdate(result);
+			Log.i("Comet","Progress Update");
+			for (Marker marker : markerlist) 
+			{	
+				marker.remove();
+			}
+			markerlist.clear();
+			
+			if(result[0].size()==0)
+			{
+				if(FirstWarningFlg)
+				{
+					Toast.makeText(getActivity(), "There are no cabs available in "+routeID, Toast.LENGTH_SHORT).show();
+					FirstWarningFlg= false;
+				}
+			}
+			
+			for (VehicleInfo latLng : result[0]) 
+			{
+				FirstWarningFlg= false;
+				Location prevLoc = new Location("dummy");
+				Location currLoc = new Location("dummy");
+				
+				prevLoc.setLatitude(latLng.getPrevLocationInfo().latitude);
+				prevLoc.setLongitude(latLng.getPrevLocationInfo().longitude);
+				
+				currLoc.setLatitude(latLng.getLocationInfo().latitude);
+				currLoc.setLongitude(latLng.getLocationInfo().longitude);
+				
+				float rotation = prevLoc.bearingTo(currLoc);
+				//Toast.makeText(getActivity(), "Rotation : "+rotation, Toast.LENGTH_SHORT).show();
+				
+				//String Title = new String();
+				//if(latLng.getSeatAvailable()>5)
+				//	Title = "You have good chance of getting it!!";
+				//else if(latLng.getSeatAvailable()>=2)
+				//	Title = "You can still try!!";
+				//else if(latLng.getSeatAvailable()>=0)
+				//	Title = "Try your Luck someone might jump off!!";
+				Log.i("FETCH", latLng.getSeatAvailable()+"");
+				
+				double percentage = ((double)latLng.getSeatAvailable()/(double)latLng.getTotalCapacity())*100;
+				percentage=new BigDecimal(percentage).setScale(0, BigDecimal.ROUND_HALF_UP).doubleValue();
+				Marker marker = map.addMarker(new MarkerOptions()
+	     		   .title("Seats Available : "+latLng.getSeatAvailable())
+	     		   .snippet(percentage + "% Free")
+	     		   .position(latLng.getLocationInfo())
+	     		   .rotation(rotation)
+	     		   .anchor(0.5f, 0.5f)
+	     		   .flat(true)
+	     		   .icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_car1)));
+	     		   //.draggable(true)
+	     		   //.snippet("The most populous city in USA.")
+	     		  //map.animateCamera(CameraUpdateFactory.newLatLngZoom(marker, 17));
+				 //marker.showInfoWindow();
+				 markerlist.add(marker);
+			
+				 CameraPosition cameraPosition = new CameraPosition.Builder()
+	             .target(latLng.getLocationInfo())      // Sets the center of the map to location user
+	             .zoom(18)                   // Sets the zoom
+	             //.bearing(rotation)                // Sets the orientation of the camera to east
+	             //.tilt(40)                   // Sets the tilt of the camera to 30 degrees
+	             .build();  
+				 map.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
+			}
+		}
+		
+	}
+	
 	@Override
 	public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
 		
 			if (isChecked) 
 		    {
-				Toast.makeText(getActivity(),"You are Subscribed", Toast.LENGTH_SHORT).show();
+				//Toast.makeText(getActivity(),"You are Subscribed", Toast.LENGTH_SHORT).show();
 				llSubscribe.setBackgroundColor(Color.RED);
 				swSubscribe.setBackgroundColor(Color.RED);
 				checkFlgOverride=false;
@@ -701,7 +828,7 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 				{
 					AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
 					builder.setTitle("Comet Ride")
-					   .setMessage("You are about to UnSubscibe Route "+pref.getString("SubscribedRoute", "")+", Do you Still want to").setCancelable(true)
+					   .setMessage("You are about to unsubscibe from "+pref.getString("SubscribedRoute", "")+", Are you sure?").setCancelable(true)
 					   .setPositiveButton("Yes", new DialogInterface.OnClickListener() 
 					   {
 							@Override
@@ -747,6 +874,7 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 
 	@Override
 	public void onStatusChanged(String provider, int status, Bundle extras) {
+	
 	}
 
 

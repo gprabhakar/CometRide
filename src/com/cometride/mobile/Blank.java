@@ -7,6 +7,7 @@ import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
 import android.os.Bundle;
 import android.support.v7.app.ActionBarActivity;
+import android.widget.Toast;
 
 public class Blank extends ActionBarActivity
 {
@@ -23,6 +24,7 @@ public class Blank extends ActionBarActivity
 	
 	public void Initialize()
 	{
+		//Toast.makeText(this,"Toast",Toast.LENGTH_SHORT).show();
 		pref= getSharedPreferences("COMET", 0);
 		editor = pref.edit();
 		editor.putString("SubscribedRoute", "");

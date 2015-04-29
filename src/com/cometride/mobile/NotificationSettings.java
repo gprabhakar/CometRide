@@ -75,7 +75,7 @@ public class NotificationSettings extends ActionBarActivity implements OnClickLi
 		chkService.setChecked(pref.getBoolean("NotifyService", true));
 		etDistance.setText(String.valueOf(pref.getInt("Distance", 200)));
 		etFrequency.setText(String.valueOf(pref.getInt("Frequency", 5)));
-		etDuration.setText(String.valueOf(pref.getInt("SubscriptionDuration", 10)));
+		etDuration.setText(String.valueOf(pref.getInt("SubscriptionDuration", 15)));
 		btnSave.setOnClickListener(this);
 		btnCancel.setOnClickListener(this);
 		
@@ -90,7 +90,7 @@ public class NotificationSettings extends ActionBarActivity implements OnClickLi
 		case R.id.btnSave:
 			int distance = 200;
 			int frequency =5;
-			int duration =10;
+			int duration =15;
 			String toastString="";
 			
 			if(chkSeat.isChecked())
@@ -131,14 +131,14 @@ public class NotificationSettings extends ActionBarActivity implements OnClickLi
 			
 			if(etDuration.getText().toString().equals(""))
 			{
-				toastString = toastString+" Default Duration 10 Mins";
-				duration =10;
+				toastString = toastString+" Default Duration 15 Mins";
+				duration =15;
 			}
 			else
 				duration =Integer.parseInt(etDuration.getText().toString());
 			
 			if(toastString.equals(""))
-				toastString ="Preferences Saved Successfully";
+				toastString ="Changes will take effect in the next Subscription.";
 			else
 				toastString=toastString+" is set";
 			

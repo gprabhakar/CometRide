@@ -1,10 +1,17 @@
 package com.cometride.mobile;
 
+import java.math.BigDecimal;
+import java.text.BreakIterator;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.MarkerOptions;
 
 import android.app.AlarmManager;
 
@@ -23,6 +30,7 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.media.RingtoneManager;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.StrictMode;
@@ -43,7 +51,8 @@ public class RiderService extends Service implements LocationListener{
 	private int duration;
 	private int frequency;
 	private int distance;
-	
+	private Thread check = null;
+	private Location currLocation;
 	//############################ LIFE CYCLE EVENTS ########################################//
 	@Override
 	public void onCreate() 
@@ -67,26 +76,34 @@ public class RiderService extends Service implements LocationListener{
 		Log.i("Comet","Service Destroy");
 		lm.removeUpdates(this);
 		alarmManager.cancel(pendingIntent);
-		Toast.makeText(this, "You are Unsubscribed from "+pref.getString("SubscribedRoute", ""), Toast.LENGTH_SHORT).show();
+		Toast.makeText(this, "You are now Unsubscribed"+pref.getString("SubscribedRoute", ""), Toast.LENGTH_LONG).show();
+		stopFlg = true;
 		super.onDestroy();
 	}
-	
+	private boolean stopFlg = false;
 	//###################################### INITIALIZE ################################//
 	public void Initialize()
 	{
 		dbController= new RiderDatabaseController(getBaseContext());
 		pref = getSharedPreferences("COMET", 0);
 		editor = pref.edit();
-		duration =pref.getInt("SubscriptionDuration", 10);
+		duration =pref.getInt("SubscriptionDuration", 15);
 	    frequency = pref.getInt("Frequency", 5);
 	    distance = pref.getInt("Distance", 200);
 	    
 	    Criteria criteria = new Criteria();
         criteria.setAccuracy(Criteria.ACCURACY_MEDIUM | Criteria.ACCURACY_MEDIUM);
-        lm = (LocationManager)getBaseContext().getSystemService(Context.LOCATION_SERVICE);
-      	String provider = lm.getBestProvider(criteria, true);
-      	lm.requestLocationUpdates(provider,100,0,this);
-      	Location location = lm.getLastKnownLocation(provider);
+        //lm = (LocationManager)getBaseContext().getSystemService(Context.LOCATION_SERVICE);
+      	//String provider = lm.getBestProvider(criteria, true);
+      	//lm.requestLocationUpdates(provider,100,0,this);
+        //Location location = lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER);
+      	
+      	lm = (LocationManager)getBaseContext().getSystemService(Context.LOCATION_SERVICE);
+      	//String provider = lm.getBestProvider(criteria, true);
+      	lm.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER,100,0,this);
+      	Location location = lm.getLastKnownLocation(LocationManager.PASSIVE_PROVIDER);
+      	
+      	
       	
         alarmManager = (AlarmManager)getSystemService(Context.ALARM_SERVICE);
         
@@ -99,7 +116,7 @@ public class RiderService extends Service implements LocationListener{
 		{
         	Calendar calSet = Calendar.getInstance();
             calSet.add(Calendar.MINUTE,duration);
-    		
+            
             intent = new Intent(getBaseContext(), Blank.class);
     		pendingIntent = PendingIntent.getActivity(getBaseContext(), 1 , intent, 0);
     	    alarmManager.set(AlarmManager.RTC_WAKEUP, calSet.getTimeInMillis(), pendingIntent);
@@ -107,29 +124,70 @@ public class RiderService extends Service implements LocationListener{
 			editor.putString("ServiceStatus", "RUNNING");
 			editor.commit();
 		}
-	}
+        StartThread();
+    }
 	
+	
+	public void StartThread()
+	{	
+		check = (new Thread() {
+            // This method is called when the thread runs
+            public void run() {
+            	while(true)
+            	{
+                	try {
+						Thread.sleep(3000);
+					} catch (InterruptedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+	            	if(stopFlg)
+	            	{	
+	            		break;
+	            	}
+	            	
+	            	List<LatLng> CabLocationList = new ArrayList<LatLng>();
+	            	CabLocationList = FetchCapacity();
+	    			if(pref.getBoolean("NotifyDistance", true))
+	    			{
+	    				Log.i("Comet", "Before");
+	    				if(pref.getString("SendDistanceNotification", "Yes").equals("Yes"))
+	    					CalculateDistance(CabLocationList,currLocation);
+	    				Log.i("Comet", "After");
+	    			}
+	               // SendNotification("Hello","Bye");
+            	}
+            }
+        });
+		check.start();
+	}
 	
 	//##################################### LOCATION BASED EVENTS ###########################//
 	@Override
-	public void onLocationChanged(Location location) {
-		UpdateCounter++;
-		List<LatLng> CabLocationList = new ArrayList<LatLng>();
+	public void onLocationChanged(Location location) 
+	{
+		currLocation= new Location("gps");
+		currLocation.setLatitude(location.getLatitude());
+		currLocation.setLongitude(location.getLongitude());
+		//UpdateCounter++;
+		//List<LatLng> CabLocationList = new ArrayList<LatLng>();
 		
-		if(UpdateCounter==5)
-		{
-			Log.i("Comet","Location Updated from Service");
-			Toast.makeText(this,"Loc Service", Toast.LENGTH_SHORT).show();
+		//if(UpdateCounter==1)
+		//{	
+			//Log.i("Comet","Location Updated from Service");
+			//Toast.makeText(this,"Loc Service", Toast.LENGTH_SHORT).show();
 			
-			CabLocationList = FetchCapacity();
-			if(pref.getBoolean("NotifyDistance", true))
-			{
-				if(pref.getString("SendDistanceNotification", "Yes").equals("Yes"))
-					CalculateDistance(CabLocationList,location);
-			}
-			UpdateCounter=0;
-		}
+			//CabLocationList = FetchCapacity();
+			//if(pref.getBoolean("NotifyDistance", true))
+			//{
+			//	if(pref.getString("SendDistanceNotification", "Yes").equals("Yes"))
+			//		CalculateDistance(CabLocationList,location);
+			//}
+			//UpdateCounter=0;
+		//}
 	}
+	
+	
 	
 	//#################################### I'M INTERESTED FEATURE FUNCTIONS ########################//
 	public List<LatLng> FetchCapacity()
@@ -172,7 +230,7 @@ public class RiderService extends Service implements LocationListener{
 				if(availability!=0)
 				{	
 					SendNotification(availability+" Seat(s) Available","");
-					Toast.makeText(getBaseContext(), "Seat Available", Toast.LENGTH_SHORT).show();
+					//Toast.makeText(getBaseContext(), "Seat Available", Toast.LENGTH_SHORT).show();
 				}
 			}
 			else
@@ -202,9 +260,10 @@ public class RiderService extends Service implements LocationListener{
 		}
 		if(cabdistance < distance)
 		{
+			//1 Miles Per Hour = 0.33334 Per Minute.
 			double ETA = (0.33334)*(cabdistance * 0.00062137)*60;
 			int min = (int)ETA;
-			int sec =  (int)(ETA - min)*60;
+			int sec = (int) Math.ceil((ETA - min)*60);
 			SendNotification("Cab Is Near You","ETA : "+min+" Mins "+sec+" Sec");
 			editor.putString("SendDistanceNotification", "No");
 			editor.commit();
@@ -274,5 +333,5 @@ public class RiderService extends Service implements LocationListener{
 	public IBinder onBind(Intent intent) {
 		return null;
 	}
-
+	
 }

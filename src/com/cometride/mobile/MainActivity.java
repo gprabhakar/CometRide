@@ -29,7 +29,9 @@ import android.location.LocationListener;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.StrictMode;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -59,7 +61,8 @@ import android.widget.Toast;
 	protected void onCreate(Bundle savedInstanceState) {	
 		super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-     }
+       
+    }
 	
 	@Override
 	protected void onPostCreate(Bundle savedInstanceState){
@@ -120,7 +123,7 @@ import android.widget.Toast;
 		fragmentManager = getFragmentManager();
 		
 		drawerLayout = (DrawerLayout) findViewById(R.id.drawerLayout);
-        drawerListner = new ActionBarDrawerToggle(this, drawerLayout,R.drawable.ic_action_action_view_list,0,0)
+        drawerListner = new ActionBarDrawerToggle(this, drawerLayout,R.drawable.ic_action_navigation_menu,0,0)
         {
         	public void onDrawerOpened(View drawerView) 
         	{
@@ -172,7 +175,7 @@ import android.widget.Toast;
 		                   .commit();
 		    getSupportActionBar().setTitle(Title);
 		    
-		    Toast.makeText(MainActivity.this,"Main Create",Toast.LENGTH_SHORT).show();     
+		    //Toast.makeText(MainActivity.this,"Main Create",Toast.LENGTH_SHORT).show();     
        }
        else
        {
@@ -180,14 +183,18 @@ import android.widget.Toast;
         	startActivity(new Intent(Settings.ACTION_DATA_ROAMING_SETTINGS));
        }
        CheckGPS();
+    
+	
 	}
+	
+	
 	
 	public void CheckGPS()
 	{
 		String provider = Settings.Secure.getString(getContentResolver(),Settings.Secure.LOCATION_PROVIDERS_ALLOWED);
 		if(provider.equals(""))
 		{
-			Toast.makeText(this, "Please Enable GPS Settings", Toast.LENGTH_LONG).show();
+			Toast.makeText(this, "Please Enable GPS Settings", Toast.LENGTH_SHORT).show();
 			Intent in = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
 			//Intent in = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS);
 			startActivity(in);
@@ -211,7 +218,7 @@ import android.widget.Toast;
 	@Override
 	public void onItemClick(AdapterView<?> parent, View view, int position,long id) 
 	{
-		Toast.makeText(this, routeList.get(position), Toast.LENGTH_SHORT).show();
+		//Toast.makeText(this, routeList.get(position), Toast.LENGTH_SHORT).show();
 		SelectItem(position);
 		Bundle args = new Bundle();
 	    android.app.Fragment fragment = null;
