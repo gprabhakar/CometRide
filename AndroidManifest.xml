@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.cometride.mobile"
-    android:versionCode="1"
-    android:versionName="1.0" xmlns:tools="http://schemas.android.com/tools">
+    android:versionCode="2"
+    android:versionName="1.1" xmlns:tools="http://schemas.android.com/tools">
 
     <uses-sdk
         android:minSdkVersion="8"
@@ -69,7 +69,7 @@
         </service>
         <meta-data
 			    android:name="com.google.android.geo.API_KEY"
-			    android:value="AIzaSyDsPKjTOYQxbsaPa69_VWTcyVQ5pgpqCUQ"/>
+			    android:value="@string/debugkey"/>
         <meta-data
 			    android:name="com.google.android.gms.version"
 			    android:value="@integer/google_play_services_version" />

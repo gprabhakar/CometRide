@@ -2479,9 +2479,11 @@ containing a value of this type.
         public static final int commono_google_play_services_api_unavailable_text=0x7f0b0032;
         public static final int create_calendar_message=0x7f0b0015;
         public static final int create_calendar_title=0x7f0b0014;
+        public static final int debugkey=0x7f0b003a;
         public static final int decline=0x7f0b0013;
-        public static final int hello_blank_fragment=0x7f0b0039;
+        public static final int hello_blank_fragment=0x7f0b003b;
         public static final int hello_world=0x7f0b0037;
+        public static final int releasekey=0x7f0b0039;
         public static final int store_picture_message=0x7f0b0011;
         public static final int store_picture_title=0x7f0b0010;
         /**  Text on a placeholder buy button when Google Play services is not

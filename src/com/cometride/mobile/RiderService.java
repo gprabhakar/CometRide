@@ -1,25 +1,16 @@
 package com.cometride.mobile;
 
-import java.math.BigDecimal;
-import java.text.BreakIterator;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 
-import com.google.android.gms.maps.CameraUpdateFactory;
-import com.google.android.gms.maps.model.BitmapDescriptorFactory;
-import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.Marker;
-import com.google.android.gms.maps.model.MarkerOptions;
-
 import android.app.AlarmManager;
 
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
-import android.app.TaskStackBuilder;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -30,7 +21,6 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.media.RingtoneManager;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.StrictMode;
@@ -46,10 +36,9 @@ public class RiderService extends Service implements LocationListener{
 	private AlarmManager alarmManager;
 	private Intent intent;
 	private PendingIntent pendingIntent;
-	private int UpdateCounter=0;
 	private RiderDatabaseController dbController;
 	private int duration;
-	private int frequency;
+	//private int frequency;
 	private int distance;
 	private Thread check = null;
 	private Location currLocation;
@@ -88,7 +77,7 @@ public class RiderService extends Service implements LocationListener{
 		pref = getSharedPreferences("COMET", 0);
 		editor = pref.edit();
 		duration =pref.getInt("SubscriptionDuration", 15);
-	    frequency = pref.getInt("Frequency", 5);
+	    //frequency = pref.getInt("Frequency", 5);
 	    distance = pref.getInt("Distance", 200);
 	    
 	    Criteria criteria = new Criteria();
@@ -138,7 +127,6 @@ public class RiderService extends Service implements LocationListener{
                 	try {
 						Thread.sleep(3000);
 					} catch (InterruptedException e) {
-						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
 	            	if(stopFlg)

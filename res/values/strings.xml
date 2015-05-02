@@ -4,6 +4,8 @@
     <string name="app_name">CometRide</string>
     <string name="hello_world">Hello world!</string>
     <string name="action_settings">Settings</string>
+    <string name="releasekey">AIzaSyAtZXyl747F9tuBdgsJkwsD9fDMpNZx8bc</string>
+    <string name="debugkey">AIzaSyDsPKjTOYQxbsaPa69_VWTcyVQ5pgpqCUQ</string>
     <string name="hello_blank_fragment">Hello blank fragment</string>
 	<string-array name="maps">
 	    <item>Phase 1</item>

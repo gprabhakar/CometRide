@@ -8,7 +8,6 @@ import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.security.Provider;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -23,28 +22,23 @@ import com.google.android.gms.maps.MapsInitializer;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.Marker;
-import com.google.android.gms.maps.model.Polygon;
 import com.google.android.gms.maps.model.PolygonOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import android.app.AlertDialog;
 import android.app.Dialog;
-import android.app.NotificationManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
 import android.graphics.Color;
-import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Parcel;
-import android.os.Parcelable;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -477,7 +471,7 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
  			    polygonOptions.strokeColor(Color.parseColor("#69BE28"));
  			    polygonOptions.strokeWidth(3);
  			    polygonOptions.fillColor(Color.parseColor("#69BE28"));
- 			    Polygon polygon = map.addPolygon(polygonOptions);
+ 			    map.addPolygon(polygonOptions);
  			}
  			 
  			
@@ -624,6 +618,7 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
         }
     }
 
+	@SuppressWarnings("unused")
 	private class FetchCabLocationTask extends AsyncTask<Void,List<VehicleInfo>,List<VehicleInfo>>
 	{
 		@Override
@@ -707,6 +702,7 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 		
 	private class FetchAsyncTask extends AsyncTask<Void,List<VehicleInfo>,Void>
 	{
+		@SuppressWarnings("unchecked")
 		@Override
 		protected Void doInBackground(Void... params) 
 		{
@@ -718,7 +714,6 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 				try {
 					Thread.sleep(3000);
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 				Log.i("Comet","Back");
@@ -733,7 +728,6 @@ public class RouteSpecificUserInterface extends android.app.Fragment implements 
 		
 		@Override
 		protected void onProgressUpdate(List<VehicleInfo>... result) {
-			// TODO Auto-generated method stub
 			super.onProgressUpdate(result);
 			Log.i("Comet","Progress Update");
 			for (Marker marker : markerlist) 

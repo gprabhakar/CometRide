@@ -1,11 +1,8 @@
 package com.cometride.mobile;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-
 import android.content.Context;
 
 import com.amazonaws.auth.CognitoCachingCredentialsProvider;
@@ -16,7 +13,6 @@ import com.amazonaws.mobileconnectors.dynamodbv2.dynamodbmapper.PaginatedQueryLi
 import com.amazonaws.mobileconnectors.dynamodbv2.dynamodbmapper.PaginatedScanList;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient;
-import com.amazonaws.services.dynamodbv2.model.QueryRequest;
 import com.google.android.gms.maps.model.LatLng;
 
 
@@ -102,6 +98,7 @@ public class RiderDatabaseController
 		return dbRouteResult;
 	}
 	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public List<String> GetRouteSpecificLatLong(String RouteID)
 	{
 		List<String> LatLong = new ArrayList<String>();
@@ -119,6 +116,7 @@ public class RiderDatabaseController
 		return LatLong;
 	}
 	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public List<VehicleInfo> GetLiveVehicleLocation(String routeID)
 	{
 		List<VehicleInfo> dbLatLongResult = new ArrayList<VehicleInfo>();
@@ -146,9 +144,10 @@ public class RiderDatabaseController
 		return dbLatLongResult;
 	}
 	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public List<DBLiveVehicleInformationClass> GetLiveVehicleAvailability(String routeID)
 	{
-		int Capacity = 0;
+		//int Capacity = 0;
 		//List<LatLng> dbLatLongResult = new ArrayList<LatLng>();
 		DBLiveVehicleInformationClass vehicleInfo = new DBLiveVehicleInformationClass();
 		vehicleInfo.setRouteID(routeID);
@@ -162,6 +161,7 @@ public class RiderDatabaseController
 		return result;
 	}
 	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public List<String> GetSafePointInfo(String routeid)
 	{
 		List<String> latlongList = new ArrayList<String>();
@@ -177,10 +177,8 @@ public class RiderDatabaseController
 		{
 			latlongList.add(dbSafePointInformationClass.getLatlong());
 		}
-
 		return latlongList;
 	}
-
 }
 
 

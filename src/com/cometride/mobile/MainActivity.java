@@ -2,12 +2,6 @@ package com.cometride.mobile;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import com.google.android.gms.maps.CameraUpdateFactory;
-import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.model.CameraPosition;
-import com.google.android.gms.maps.model.LatLng;
-
 import android.support.v4.app.ActionBarDrawerToggle;
 import android.support.v4.view.ViewPager;
 import android.support.v4.widget.DrawerLayout;
@@ -20,7 +14,6 @@ import android.app.ActivityManager.RunningServiceInfo;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.SharedPreferences.Editor;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -29,9 +22,7 @@ import android.location.LocationListener;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.StrictMode;
-import android.util.Log;
 import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -44,7 +35,6 @@ import android.widget.Toast;
 @SuppressWarnings("deprecation")
 @SuppressLint("RtlHardcoded") public class MainActivity extends ActionBarActivity implements LocationListener, OnItemClickListener
 {
-	private GoogleMap map;
 	ViewPager mviewpager;
 	ActionBar actionBar;
 	private DrawerLayout drawerLayout;
@@ -54,7 +44,6 @@ import android.widget.Toast;
 	private RiderDatabaseController dbcontroller;
 	private android.app.FragmentManager fragmentManager;
 	private SharedPreferences pref;
-	private Editor editor;
 	
 	//############################################### LIFE CYCKE EVENTS ############################################//
 	@Override
@@ -95,7 +84,6 @@ import android.widget.Toast;
 	
 	@Override
 	public void onBackPressed() {
-		// TODO Auto-generated method stub
 		android.os.Process.killProcess(android.os.Process.myPid());
 	}
 	
@@ -117,7 +105,6 @@ import android.widget.Toast;
 		StrictMode.setThreadPolicy(policy);
 		
 		pref = getSharedPreferences("COMET",0);
-		editor= pref.edit();
 		
 		dbcontroller = new RiderDatabaseController(this);
 		fragmentManager = getFragmentManager();
@@ -140,66 +127,69 @@ import android.widget.Toast;
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#008542")));
         
-       
-       if(isNetworkAvailable())
-       { 	
-    	    //Loading RouteID Information from RouteInformation Table.
-    	    routeList = new ArrayList<String>();
-    	    routeList = dbcontroller.GetAllRoute();
-    	    routeList.add("All Routes");
-    	    
-	        final CustomList customlistview = new CustomList(this,routeList);
-			
-	        //Arrays.asList(routelistMap.keySet().toArray());
-	        listView = (ListView) findViewById(R.id.drawerList);
-	        listView.setAdapter(customlistview);
-	        listView.setOnItemClickListener(this);
-        
-	        //Display ALl Route Information
-	        Bundle args = new Bundle();
-		    android.app.Fragment fragment = null;
-			
-		    String Title = getSupportActionBar().getTitle().toString();
-		    if(Title.equals("CometRide"))
-		    {
-		    	if(pref.getString("CurrentScreen","").equals(""))
-		    		Title = "All Routes";
-		    	else if(!Title.equals("Exit"))
-		    		Title =pref.getString("CurrentScreen", "");
-		    }
-		    
-		    fragment = new RouteSpecificUserInterface(Title);
-			fragment.setArguments(args);
-		    fragmentManager.beginTransaction()
-		                   .replace(R.id.mainContent, fragment)
-		                   .commit();
-		    getSupportActionBar().setTitle(Title);
-		    
-		    //Toast.makeText(MainActivity.this,"Main Create",Toast.LENGTH_SHORT).show();     
+       if(CheckGPS())
+       {
+	       if(isNetworkAvailable())
+	       { 	
+	    	    //Loading RouteID Information from RouteInformation Table.
+	    	    routeList = new ArrayList<String>();
+	    	    routeList = dbcontroller.GetAllRoute();
+	    	    routeList.add("All Routes");
+	    	    
+		        final CustomList customlistview = new CustomList(this,routeList);
+				
+		        //Arrays.asList(routelistMap.keySet().toArray());
+		        listView = (ListView) findViewById(R.id.drawerList);
+		        listView.setAdapter(customlistview);
+		        listView.setOnItemClickListener(this);
+	        
+		        //Display ALl Route Information
+		        Bundle args = new Bundle();
+			    android.app.Fragment fragment = null;
+				
+			    String Title = getSupportActionBar().getTitle().toString();
+			    if(Title.equals("CometRide"))
+			    {
+			    	if(pref.getString("CurrentScreen","").equals(""))
+			    		Title = "All Routes";
+			    	else if(!Title.equals("Exit"))
+			    		Title =pref.getString("CurrentScreen", "");
+			    }
+			    
+			    fragment = new RouteSpecificUserInterface(Title);
+				fragment.setArguments(args);
+			    fragmentManager.beginTransaction()
+			                   .replace(R.id.mainContent, fragment)
+			                   .commit();
+			    getSupportActionBar().setTitle(Title);
+			    
+			    //Toast.makeText(MainActivity.this,"Main Create",Toast.LENGTH_SHORT).show();     
+	       }
+	       else
+	       {
+	        	Toast.makeText(this, "Please Connect to the Internet.", Toast.LENGTH_SHORT).show();
+	        	startActivity(new Intent(Settings.ACTION_DATA_ROAMING_SETTINGS));
+	       }
        }
        else
        {
-        	Toast.makeText(this, "Please Connect to the Internet.", Toast.LENGTH_SHORT).show();
-        	startActivity(new Intent(Settings.ACTION_DATA_ROAMING_SETTINGS));
+    	   Toast.makeText(this, "Please Enable GPS Settings", Toast.LENGTH_SHORT).show();
+	   	   startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
        }
-       CheckGPS();
-    
-	
 	}
 	
-	
-	
-	public void CheckGPS()
+	//#################################### CODE FOR ENABLING LOCATION SERVICE ####################################//
+	public boolean CheckGPS()
 	{
 		String provider = Settings.Secure.getString(getContentResolver(),Settings.Secure.LOCATION_PROVIDERS_ALLOWED);
 		if(provider.equals(""))
 		{
-			Toast.makeText(this, "Please Enable GPS Settings", Toast.LENGTH_SHORT).show();
-			Intent in = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
-			//Intent in = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS);
-			startActivity(in);
+			
+			return false;
 		}
-	}
+		else
+			return true;
+	}	
 	
 	private boolean isNetworkAvailable() 
 	{
